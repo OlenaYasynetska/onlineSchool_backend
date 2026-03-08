@@ -65,3 +65,26 @@ src/main/java/com/education/platform/
 - **GitHub Actions**: сборка → Docker image → деплой на AWS (EC2/ECS).
 - **Frontend**: Angular → S3 + CloudFront.
 - **БД**: MongoDB Atlas.
+
+
+education-backend (onlineSchool_backend)
+├── src/main/java/com/education/platform/
+│   ├── config/
+│   │   ├── security/     → SecurityConfig, JwtAuthenticationFilter
+│   │   ├── database/     → MongoConfig
+│   │   └── OpenApiConfig
+│   ├── controller/      → AuthController, StudentController, TeacherController
+│   ├── service/         → AuthService, StudentService, TeacherService
+│   ├── repository/      → User, Student, Teacher, School, Course, Lesson, Assignment
+│   ├── model/           → User, School, Student, Teacher, Course, Lesson, Assignment + Role
+│   ├── dto/request & response
+│   ├── mapper/          → UserMapper, StudentMapper, TeacherMapper (MapStruct)
+│   ├── exception/       → GlobalExceptionHandler, ResourceNotFoundException, ErrorBody
+│   └── util/            → JwtUtil
+├── src/main/resources/
+│   ├── application.yml
+│   └── application-prod.yml
+├── Dockerfile
+├── pom.xml
+├── .gitignore
+└── README.md
