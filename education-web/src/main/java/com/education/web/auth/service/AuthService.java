@@ -4,26 +4,38 @@ import com.education.web.auth.dto.AuthResponse;
 import com.education.web.auth.dto.AuthUserResponse;
 import com.education.web.auth.dto.LoginRequest;
 import com.education.web.auth.dto.RegisterRequest;
+import com.education.web.auth.model.OrganizationEntity;
+import com.education.web.auth.model.SubscriptionPlanEntity;
 import com.education.web.auth.model.UserEntity;
 import com.education.web.auth.model.UserRole;
+import com.education.web.auth.repository.OrganizationJpaRepository;
+import com.education.web.auth.repository.SubscriptionPlanJpaRepository;
 import com.education.web.auth.repository.UserJpaRepository;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+
 @Service
 public class AuthService {
     private final UserJpaRepository users;
+    private final OrganizationJpaRepository organizations;
+    private final SubscriptionPlanJpaRepository plans;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
     public AuthService(
             UserJpaRepository users,
+            OrganizationJpaRepository organizations,
+            SubscriptionPlanJpaRepository plans,
             PasswordEncoder passwordEncoder,
             JwtService jwtService
     ) {
         this.users = users;
+        this.organizations = organizations;
+        this.plans = plans;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -39,10 +51,26 @@ public class AuthService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setFirstName(request.firstName().trim());
         user.setLastName(request.lastName().trim());
-        user.setRole(UserRole.STUDENT);
+        user.setRole(UserRole.ADMIN_SCHOOL);
         user.setEnabled(true);
         user = users.save(user);
-        return buildAuthResponse(user);
+
+        SubscriptionPlanEntity plan = plans.findByPlanKeyIgnoreCase(request.plan().trim())
+                .orElseThrow(() -> new IllegalArgumentException("Unknown plan: " + request.plan()));
+
+        OrganizationEntity org = new OrganizationEntity();
+        org.setName(request.organizationName().trim());
+        org.setDescription("Registered via auth form");
+        org.setAdminUserId(user.getId());
+        org.setPlan(plan);
+        org.setPaymentPeriod(request.paymentPeriod().trim().toLowerCase());
+        org.setStatus("Active");
+        org.setAddress(request.address().trim());
+        org.setCountry(request.country().trim());
+        org.setNextBillingAt(calculateNextBillingDate(org.getPaymentPeriod()));
+        org = organizations.save(org);
+
+        return buildAuthResponse(user, org.getId());
     }
 
     @Transactional(readOnly = true)
@@ -55,10 +83,10 @@ public class AuthService {
         if (!user.isEnabled()) {
             throw new BadCredentialsException("Account is disabled");
         }
-        return buildAuthResponse(user);
+        return buildAuthResponse(user, null);
     }
 
-    private AuthResponse buildAuthResponse(UserEntity user) {
+    private AuthResponse buildAuthResponse(UserEntity user, String schoolId) {
         String accessToken = jwtService.generateAccessToken(
                 user.getId(),
                 user.getEmail(),
@@ -71,12 +99,20 @@ public class AuthService {
                 user.getFirstName(),
                 user.getLastName(),
                 user.getRole().name(),
-                null,
+                schoolId,
                 null,
                 user.getCreatedAt() == null ? null : user.getCreatedAt().toString(),
                 user.getUpdatedAt() == null ? null : user.getUpdatedAt().toString()
         );
         return new AuthResponse(userResponse, accessToken, refreshToken, jwtService.getExpirationSeconds());
+    }
+
+    private LocalDateTime calculateNextBillingDate(String period) {
+        return switch (period) {
+            case "yearly" -> LocalDateTime.now().plusYears(1);
+            case "quarterly" -> LocalDateTime.now().plusMonths(3);
+            default -> LocalDateTime.now().plusMonths(1);
+        };
     }
 }
 

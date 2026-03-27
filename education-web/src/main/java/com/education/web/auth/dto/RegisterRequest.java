@@ -8,7 +8,14 @@ public record RegisterRequest(
         @NotBlank @Email String email,
         @NotBlank @Size(min = 8, message = "Password must be at least 8 characters") String password,
         @NotBlank String firstName,
-        @NotBlank String lastName
+        @NotBlank String lastName,
+        @NotBlank String phone,
+        @NotBlank String dateOfBirth,
+        @NotBlank String organizationName,
+        @NotBlank String plan,
+        @NotBlank String paymentPeriod,
+        @NotBlank String address,
+        @NotBlank String country
 ) {
 }
 
