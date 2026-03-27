@@ -26,9 +26,6 @@ public class StudentService {
             throw new IllegalArgumentException("Student profile already exists for this user");
         }
         Student student = studentMapper.toEntity(request);
-        student.setCreatedAt(Instant.now());
-        student.setUpdatedAt(Instant.now());
-        student.setCourseIds(student.getCourseIds() != null ? student.getCourseIds() : Set.of());
         student = studentRepository.save(student);
         return studentMapper.toResponse(student);
     }
