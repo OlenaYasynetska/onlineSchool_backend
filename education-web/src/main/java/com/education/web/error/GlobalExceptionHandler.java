@@ -47,6 +47,20 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.UNAUTHORIZED, ex.getMessage(), request.getRequestURI());
     }
 
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiErrorResponse> handleUnhandled(
+            Exception ex,
+            HttpServletRequest request
+    ) {
+        // Чтобы фронт видел причину, а мы могли понять SQL/валидационную ошибку.
+        ex.printStackTrace();
+        String msg = ex.getMessage();
+        if (msg == null || msg.isBlank()) {
+            msg = ex.getClass().getSimpleName();
+        }
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, msg, request.getRequestURI());
+    }
+
     private ResponseEntity<ApiErrorResponse> build(HttpStatus status, String message, String path) {
         ApiErrorResponse body = new ApiErrorResponse(
                 Instant.now(),

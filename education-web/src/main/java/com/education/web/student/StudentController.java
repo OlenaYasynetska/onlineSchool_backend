@@ -51,7 +51,7 @@ public class StudentController {
 
     @GetMapping
     public List<StudentView> getBySchool(@RequestParam String schoolId) {
-        return getStudentsBySchoolUseCase.execute(schoolId);
+        return getStudentsBySchoolUseCase.executeBySchoolId(schoolId);
     }
 }
 

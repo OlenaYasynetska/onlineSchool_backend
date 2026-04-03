@@ -8,5 +8,7 @@ public interface SpringDataStudentJpaRepository extends JpaRepository<StudentJpa
     boolean existsByEmail(String email);
 
     List<StudentJpaEntity> findBySchoolId(String schoolId);
+
+    long countBySchoolId(String schoolId);
 }
 

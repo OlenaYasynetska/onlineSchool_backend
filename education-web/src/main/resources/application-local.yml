@@ -1,0 +1,9 @@
+# Локальная разработка: один раз включи профиль "local", если меняли уже применённые Flyway-скрипты (V1/V2/V3)
+# и видишь "Migration checksum mismatch" / "failed validation".
+# IntelliJ: Run → Edit Configurations → EducationWebApplication → Active profiles: local
+# После успешного старта профиль "local" можно убрать (repair выполняется при старте, checksum в БД обновится).
+#
+# В продакшене этот профиль не используй.
+spring:
+  flyway:
+    repair-on-migrate: true

@@ -55,8 +55,20 @@ public class AuthService {
         user.setEnabled(true);
         user = users.save(user);
 
-        SubscriptionPlanEntity plan = plans.findByPlanKeyIgnoreCase(request.plan().trim())
-                .orElseThrow(() -> new IllegalArgumentException("Unknown plan: " + request.plan()));
+        String planKey = request.plan().trim().toLowerCase();
+        SubscriptionPlanEntity plan = plans.findByPlanKeyIgnoreCase(planKey)
+                .orElseGet(() -> {
+                    // Если в БД пока нет seed-строк (например, в dev окружении), создаём план на лету.
+                    SubscriptionPlanEntity created = new SubscriptionPlanEntity();
+                    created.setPlanKey(planKey);
+                    created.setTitle(switch (planKey) {
+                        case "pro" -> "Pro Plan";
+                        case "standard" -> "Standard Plan";
+                        case "free" -> "Free Plan";
+                        default -> planKey;
+                    });
+                    return plans.save(created);
+                });
 
         OrganizationEntity org = new OrganizationEntity();
         org.setName(request.organizationName().trim());
@@ -83,7 +95,16 @@ public class AuthService {
         if (!user.isEnabled()) {
             throw new BadCredentialsException("Account is disabled");
         }
-        return buildAuthResponse(user, null);
+
+        String schoolId = null;
+        if (user.getRole() == UserRole.ADMIN_SCHOOL) {
+            schoolId = organizations
+                    .findByAdminUserId(user.getId())
+                    .map(OrganizationEntity::getId)
+                    .orElse(null);
+        }
+
+        return buildAuthResponse(user, schoolId);
     }
 
     private AuthResponse buildAuthResponse(UserEntity user, String schoolId) {

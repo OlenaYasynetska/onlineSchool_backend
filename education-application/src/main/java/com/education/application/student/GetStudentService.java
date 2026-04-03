@@ -26,7 +26,7 @@ public class GetStudentService implements GetStudentByIdUseCase, GetStudentsBySc
     }
 
     @Override
-    public List<StudentView> execute(String schoolId) {
+    public List<StudentView> executeBySchoolId(String schoolId) {
         return studentRepository
                 .findBySchoolId(new SchoolId(schoolId))
                 .stream()
