@@ -1,5 +1,16 @@
 package com.education.web.schooladmin.dto;
 
-/** Викладач школи для випадаючого списку у формі групи. */
-public record SchoolTeacherOptionResponse(String id, String displayName) {
+import java.util.List;
+
+/**
+ * Викладач школи: список у формі групи + розширений рядок у таблиці Teachers.
+ */
+public record SchoolTeacherOptionResponse(
+        String id,
+        String displayName,
+        String email,
+        String phone,
+        List<String> subjectTitles,
+        List<String> groupNames
+) {
 }

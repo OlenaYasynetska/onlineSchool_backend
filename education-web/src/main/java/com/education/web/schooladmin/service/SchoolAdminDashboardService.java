@@ -5,9 +5,12 @@ import com.education.application.student.StudentView;
 import com.education.web.auth.model.OrganizationEntity;
 import com.education.web.auth.model.PaymentEntity;
 import com.education.web.auth.model.SchoolGroupEntity;
+import com.education.web.auth.model.SchoolGroupStudentEntity;
+import com.education.web.auth.model.UserEntity;
 import com.education.web.auth.repository.OrganizationJpaRepository;
 import com.education.web.auth.repository.PaymentJpaRepository;
 import com.education.web.auth.repository.SchoolGroupJpaRepository;
+import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
 import com.education.web.schooladmin.dto.PaymentHistoryRowResponse;
 import com.education.web.schooladmin.dto.SchoolAdminDashboardResponse;
 import com.education.web.schooladmin.dto.SchoolAdminDashboardStatsResponse;
@@ -22,7 +25,10 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -37,17 +43,20 @@ public class SchoolAdminDashboardService {
     private final PaymentJpaRepository payments;
     private final OrganizationJpaRepository organizations;
     private final SchoolGroupJpaRepository schoolGroups;
+    private final SchoolGroupStudentJpaRepository schoolGroupStudents;
 
     public SchoolAdminDashboardService(
             GetStudentsBySchoolUseCase getStudentsBySchoolUseCase,
             PaymentJpaRepository payments,
             OrganizationJpaRepository organizations,
-            SchoolGroupJpaRepository schoolGroups
+            SchoolGroupJpaRepository schoolGroups,
+            SchoolGroupStudentJpaRepository schoolGroupStudents
     ) {
         this.getStudentsBySchoolUseCase = getStudentsBySchoolUseCase;
         this.payments = payments;
         this.organizations = organizations;
         this.schoolGroups = schoolGroups;
+        this.schoolGroupStudents = schoolGroupStudents;
     }
 
     @Transactional(readOnly = true)
@@ -57,12 +66,16 @@ public class SchoolAdminDashboardService {
         List<PaymentEntity> paymentRows = payments
                 .findAllByOrganization_IdOrderByCreatedAtDesc(schoolId);
 
+        Map<String, List<String>> groupNamesByStudent =
+                groupNamesByStudentId(schoolId);
+
         List<StudentRowResponse> studentsResponse = studentViews.stream()
                 .map(s -> new StudentRowResponse(
                         s.id(),
                         s.fullName(),
                         s.email(),
-                        formatDate(s.createdAt())
+                        formatDate(s.createdAt()),
+                        groupNamesByStudent.getOrDefault(s.id(), List.of())
                 ))
                 .toList();
 
@@ -90,12 +103,13 @@ public class SchoolAdminDashboardService {
                 buildSubscriptionInfo(schoolId);
 
         List<SchoolGroupCardResponse> groupsResponse = schoolGroups
-                .findByOrganization_IdOrderByCreatedAtDesc(schoolId)
+                .findByOrganization_IdOrderByCreatedAtAsc(schoolId)
                 .stream()
                 .map(this::toGroupCard)
                 .toList();
 
         return new SchoolAdminDashboardResponse(
+                schoolId,
                 new SchoolAdminDashboardStatsResponse(
                         studentViews.size(),
                         paymentRows.size(),
@@ -109,24 +123,55 @@ public class SchoolAdminDashboardService {
         );
     }
 
+    private Map<String, List<String>> groupNamesByStudentId(String schoolId) {
+        List<SchoolGroupStudentEntity> links =
+                schoolGroupStudents.findByGroup_Organization_Id(schoolId);
+        Map<String, List<String>> map = new HashMap<>();
+        for (SchoolGroupStudentEntity link : links) {
+            String sid = link.getStudentId();
+            String name = link.getGroup().getName();
+            map.computeIfAbsent(sid, k -> new ArrayList<>()).add(name);
+        }
+        for (List<String> names : map.values()) {
+            names.sort(String::compareToIgnoreCase);
+        }
+        return map;
+    }
+
     private SchoolGroupCardResponse toGroupCard(SchoolGroupEntity g) {
         LocalDate start = g.getStartDate();
         LocalDate end = g.getEndDate();
         String topics = g.getTopicsLabel() != null ? g.getTopicsLabel() : "";
         String subjectId = g.getSubject() != null ? g.getSubject().getId() : null;
         String teacherId = g.getTeacher() != null ? g.getTeacher().getId() : null;
+        String teacherDisplayName = formatTeacherDisplayName(g);
         return new SchoolGroupCardResponse(
                 g.getId(),
                 g.getName(),
                 g.getCode(),
                 subjectId,
                 teacherId,
+                teacherDisplayName,
                 topics,
                 start != null ? DATE_FMT.format(start) : "—",
                 end != null ? DATE_FMT.format(end) : "—",
                 g.getStudentsCount(),
                 g.isActive()
         );
+    }
+
+    private String formatTeacherDisplayName(SchoolGroupEntity g) {
+        if (g.getTeacher() == null) {
+            return null;
+        }
+        UserEntity u = g.getTeacher().getUser();
+        if (u == null) {
+            return null;
+        }
+        String first = u.getFirstName() != null ? u.getFirstName().trim() : "";
+        String last = u.getLastName() != null ? u.getLastName().trim() : "";
+        String full = (first + " " + last).trim();
+        return full.isEmpty() ? null : full;
     }
 
     private SchoolSubscriptionInfoResponse buildSubscriptionInfo(String schoolId) {

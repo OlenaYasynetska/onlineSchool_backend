@@ -12,6 +12,8 @@ public record CreateSchoolTeacherRequest(
         String lastName,
         String password,
         /** Назви предметів; кожен елемент — окремий рядок у {@code teacher_subjects}. */
-        List<String> subjects
+        List<String> subjects,
+        /** Опційно; зберігається в {@code users.phone}. */
+        String phone
 ) {
 }

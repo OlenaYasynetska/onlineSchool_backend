@@ -6,6 +6,8 @@ public record SchoolGroupCardResponse(
         String code,
         String subjectId,
         String teacherId,
+        /** Ім'я з users (first + last), якщо група прив'язана до викладача. */
+        String teacherDisplayName,
         String topicsLabel,
         String startDate,
         String endDate,

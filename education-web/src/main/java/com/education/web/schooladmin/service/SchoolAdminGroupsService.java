@@ -2,6 +2,7 @@ package com.education.web.schooladmin.service;
 
 import com.education.web.auth.model.OrganizationEntity;
 import com.education.web.auth.model.SchoolGroupEntity;
+import com.education.web.auth.model.UserEntity;
 import com.education.web.auth.model.SchoolSubjectEntity;
 import com.education.web.auth.model.TeacherEntity;
 import com.education.web.auth.repository.OrganizationJpaRepository;
@@ -100,6 +101,19 @@ public class SchoolAdminGroupsService {
             entity.setTopicsLabel(topicsTrimmed);
         }
 
+        String tid = req.teacherId() != null ? req.teacherId().trim() : "";
+        if (!tid.isBlank()) {
+            TeacherEntity teacher = teachers
+                    .findByIdAndSchool_Id(tid, schoolId)
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Teacher not found for this school"
+                    ));
+            entity.setTeacher(teacher);
+        } else {
+            entity.setTeacher(null);
+        }
+
         entity.setStartDate(startDate);
         entity.setEndDate(endDate);
         entity.setStudentsCount(req.studentsCount());
@@ -132,11 +146,26 @@ public class SchoolAdminGroupsService {
                 g.getCode(),
                 subjectId,
                 teacherId,
+                formatTeacherDisplayName(g),
                 g.getTopicsLabel() != null ? g.getTopicsLabel() : "",
                 g.getStartDate() != null ? OUTPUT_DATE_FMT.format(g.getStartDate()) : "—",
                 g.getEndDate() != null ? OUTPUT_DATE_FMT.format(g.getEndDate()) : "—",
                 g.getStudentsCount(),
                 g.isActive()
         );
+    }
+
+    private String formatTeacherDisplayName(SchoolGroupEntity g) {
+        if (g.getTeacher() == null) {
+            return null;
+        }
+        UserEntity u = g.getTeacher().getUser();
+        if (u == null) {
+            return null;
+        }
+        String first = u.getFirstName() != null ? u.getFirstName().trim() : "";
+        String last = u.getLastName() != null ? u.getLastName().trim() : "";
+        String full = (first + " " + last).trim();
+        return full.isEmpty() ? null : full;
     }
 }

@@ -17,4 +17,6 @@ public interface TeacherJpaRepository extends JpaRepository<TeacherEntity, Strin
     List<TeacherEntity> findAllBySchoolIdWithUserOrderByName(@Param("schoolId") String schoolId);
 
     Optional<TeacherEntity> findByIdAndSchool_Id(String id, String schoolId);
+
+    Optional<TeacherEntity> findByUser_Id(String userId);
 }

@@ -33,6 +33,9 @@ public class UserEntity {
     @Column(name = "last_name", nullable = false, length = 255)
     private String lastName;
 
+    @Column(name = "phone", length = 32)
+    private String phone;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "role", nullable = false, length = 32)
@@ -100,6 +103,14 @@ public class UserEntity {
 
     public void setLastName(String lastName) {
         this.lastName = lastName;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
     }
 
     public UserRole getRole() {

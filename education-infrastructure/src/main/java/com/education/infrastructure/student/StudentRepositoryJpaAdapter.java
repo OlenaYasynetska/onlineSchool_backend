@@ -38,7 +38,9 @@ public class StudentRepositoryJpaAdapter implements StudentRepository {
 
     @Override
     public List<Student> findBySchoolId(SchoolId schoolId) {
-        return jpaRepository.findBySchoolId(schoolId.value()).stream().map(this::toDomain).toList();
+        return jpaRepository.findBySchoolIdOrderByCreatedAtAsc(schoolId.value()).stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     private StudentJpaEntity toEntity(Student student) {

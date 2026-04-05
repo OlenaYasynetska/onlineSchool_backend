@@ -9,6 +9,8 @@ public interface SpringDataStudentJpaRepository extends JpaRepository<StudentJpa
 
     List<StudentJpaEntity> findBySchoolId(String schoolId);
 
+    List<StudentJpaEntity> findBySchoolIdOrderByCreatedAtAsc(String schoolId);
+
     long countBySchoolId(String schoolId);
 }
 
