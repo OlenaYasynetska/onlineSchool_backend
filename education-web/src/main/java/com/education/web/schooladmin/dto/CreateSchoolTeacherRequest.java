@@ -10,10 +10,13 @@ public record CreateSchoolTeacherRequest(
         String email,
         String firstName,
         String lastName,
+        /** null або порожньо — згенерувати випадковий пароль. */
         String password,
         /** Назви предметів; кожен елемент — окремий рядок у {@code teacher_subjects}. */
         List<String> subjects,
         /** Опційно; зберігається в {@code users.phone}. */
-        String phone
+        String phone,
+        /** За замовчуванням true — лист із посиланням на вхід і паролем. */
+        Boolean sendInviteEmail
 ) {
 }

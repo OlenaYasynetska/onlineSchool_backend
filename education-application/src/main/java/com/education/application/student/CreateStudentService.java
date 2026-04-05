@@ -24,7 +24,7 @@ public class CreateStudentService implements CreateStudentUseCase {
             throw new DuplicateStudentEmailException(email.value());
         }
 
-        Student student = Student.createNew(command.fullName(), email, schoolId);
+        Student student = Student.createNew(command.fullName(), email, schoolId, command.linkedUserId());
         Student saved = studentRepository.save(student);
 
         return new StudentView(

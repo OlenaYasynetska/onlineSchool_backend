@@ -1,6 +1,8 @@
 package com.education.web.teacher;
 
 import com.education.web.schooladmin.dto.SchoolGroupCardResponse;
+import com.education.web.schooladmin.dto.StudentRowResponse;
+import com.education.web.teacher.dto.TeacherActivityEntryResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -25,5 +27,17 @@ public class TeacherDashboardController {
     @GetMapping("/groups")
     public List<SchoolGroupCardResponse> myGroups(@RequestParam("userId") String userId) {
         return teacherDashboardService.listGroupsForTeacherUser(userId);
+    }
+
+    /** Студенти, зараховані в групи цього вчителя. */
+    @GetMapping("/students")
+    public List<StudentRowResponse> myStudents(@RequestParam("userId") String userId) {
+        return teacherDashboardService.listRosterForTeacherUser(userId);
+    }
+
+    /** Останні зарахування на групи (з {@code school_group_students}). */
+    @GetMapping("/activity")
+    public List<TeacherActivityEntryResponse> myActivity(@RequestParam("userId") String userId) {
+        return teacherDashboardService.listActivityForTeacherUser(userId);
     }
 }

@@ -40,7 +40,8 @@ public class GetStudentService implements GetStudentByIdUseCase, GetStudentsBySc
                 student.fullName(),
                 student.email().value(),
                 student.schoolId().value(),
-                student.createdAt()
+                student.createdAt(),
+                false
         );
     }
 }

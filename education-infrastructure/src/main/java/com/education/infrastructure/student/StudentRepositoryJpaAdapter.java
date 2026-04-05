@@ -49,6 +49,7 @@ public class StudentRepositoryJpaAdapter implements StudentRepository {
         entity.setFullName(student.fullName());
         entity.setEmail(student.email().value());
         entity.setSchoolId(student.schoolId().value());
+        entity.setUserId(student.linkedUserId());
         entity.setCreatedAt(student.createdAt());
         return entity;
     }
@@ -59,6 +60,7 @@ public class StudentRepositoryJpaAdapter implements StudentRepository {
                 entity.getFullName(),
                 new Email(entity.getEmail()),
                 new SchoolId(entity.getSchoolId()),
+                entity.getUserId(),
                 entity.getCreatedAt()
         );
     }

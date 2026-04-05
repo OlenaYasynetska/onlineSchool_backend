@@ -156,6 +156,7 @@ public class SchoolAdminDashboardService {
                 start != null ? DATE_FMT.format(start) : "—",
                 end != null ? DATE_FMT.format(end) : "—",
                 g.getStudentsCount(),
+                g.getHomeworkStarsTotal(),
                 g.isActive()
         );
     }

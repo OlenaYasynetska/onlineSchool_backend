@@ -10,4 +10,6 @@ public interface SchoolGroupStudentJpaRepository extends JpaRepository<SchoolGro
     boolean existsByStudentIdAndGroup_Id(String studentId, String groupId);
 
     List<SchoolGroupStudentEntity> findByGroup_Organization_Id(String organizationId);
+
+    List<SchoolGroupStudentEntity> findByStudentId(String studentId);
 }

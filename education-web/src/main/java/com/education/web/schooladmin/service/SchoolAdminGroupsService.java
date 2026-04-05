@@ -151,6 +151,7 @@ public class SchoolAdminGroupsService {
                 g.getStartDate() != null ? OUTPUT_DATE_FMT.format(g.getStartDate()) : "—",
                 g.getEndDate() != null ? OUTPUT_DATE_FMT.format(g.getEndDate()) : "—",
                 g.getStudentsCount(),
+                g.getHomeworkStarsTotal(),
                 g.isActive()
         );
     }

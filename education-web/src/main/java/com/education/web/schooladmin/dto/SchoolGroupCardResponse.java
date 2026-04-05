@@ -12,6 +12,8 @@ public record SchoolGroupCardResponse(
         String startDate,
         String endDate,
         int studentsCount,
+        /** Сумарні зірки за ДЗ усіх учнів групи. */
+        int homeworkStarsTotal,
         boolean active
 ) {
 }

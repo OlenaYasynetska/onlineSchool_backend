@@ -11,6 +11,17 @@ public record SchoolTeacherOptionResponse(
         String email,
         String phone,
         List<String> subjectTitles,
-        List<String> groupNames
+        List<String> groupNames,
+        boolean inviteEmailSent
 ) {
+    public SchoolTeacherOptionResponse(
+            String id,
+            String displayName,
+            String email,
+            String phone,
+            List<String> subjectTitles,
+            List<String> groupNames
+    ) {
+        this(id, displayName, email, phone, subjectTitles, groupNames, false);
+    }
 }

@@ -23,6 +23,9 @@ public class StudentJpaEntity {
     @Column(name = "school_id", nullable = false, length = 36)
     private String schoolId;
 
+    @Column(name = "user_id", length = 36)
+    private String userId;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -56,6 +59,14 @@ public class StudentJpaEntity {
 
     public void setSchoolId(String schoolId) {
         this.schoolId = schoolId;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 
     public Instant getCreatedAt() {

@@ -50,6 +50,10 @@ public class SchoolGroupEntity {
     @Column(name = "students_count", nullable = false)
     private int studentsCount;
 
+    /** Сумарні зірки за ДЗ усіх учнів групи (оновлюється при оцінюванні). */
+    @Column(name = "homework_stars_total", nullable = false)
+    private int homeworkStarsTotal = 0;
+
     @Column(name = "active", nullable = false)
     private boolean active;
 
@@ -144,6 +148,14 @@ public class SchoolGroupEntity {
 
     public void setStudentsCount(int studentsCount) {
         this.studentsCount = studentsCount;
+    }
+
+    public int getHomeworkStarsTotal() {
+        return homeworkStarsTotal;
+    }
+
+    public void setHomeworkStarsTotal(int homeworkStarsTotal) {
+        this.homeworkStarsTotal = homeworkStarsTotal;
     }
 
     public boolean isActive() {

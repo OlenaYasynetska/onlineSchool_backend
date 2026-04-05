@@ -13,8 +13,10 @@ import com.education.web.auth.repository.SchoolSubjectJpaRepository;
 import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.auth.repository.TeacherSubjectJpaRepository;
 import com.education.web.auth.repository.UserJpaRepository;
+import com.education.web.mail.AccountInvitationMailService;
 import com.education.web.schooladmin.dto.CreateSchoolTeacherRequest;
 import com.education.web.schooladmin.dto.SchoolTeacherOptionResponse;
+import com.education.web.util.SecurePasswordGenerator;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,7 @@ import java.util.List;
 public class SchoolAdminTeachersService {
 
     private static final int MIN_PASSWORD_LEN = 8;
+    private static final int GENERATED_PASSWORD_LEN = 12;
     private static final int MAX_SUBJECT_TITLE_LEN = 255;
 
     private final OrganizationJpaRepository organizations;
@@ -36,6 +39,7 @@ public class SchoolAdminTeachersService {
     private final SchoolGroupJpaRepository schoolGroups;
     private final UserJpaRepository users;
     private final PasswordEncoder passwordEncoder;
+    private final AccountInvitationMailService invitationMailService;
 
     public SchoolAdminTeachersService(
             OrganizationJpaRepository organizations,
@@ -44,7 +48,8 @@ public class SchoolAdminTeachersService {
             TeacherSubjectJpaRepository teacherSubjects,
             SchoolGroupJpaRepository schoolGroups,
             UserJpaRepository users,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            AccountInvitationMailService invitationMailService
     ) {
         this.organizations = organizations;
         this.schoolSubjects = schoolSubjects;
@@ -53,6 +58,7 @@ public class SchoolAdminTeachersService {
         this.schoolGroups = schoolGroups;
         this.users = users;
         this.passwordEncoder = passwordEncoder;
+        this.invitationMailService = invitationMailService;
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +67,7 @@ public class SchoolAdminTeachersService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "School not found");
         }
         return teachers.findAllBySchoolIdWithUserOrderByName(schoolId).stream()
-                .map(this::toOption)
+                .map(t -> toOption(t, false))
                 .toList();
     }
 
@@ -85,11 +91,13 @@ public class SchoolAdminTeachersService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing first or last name");
         }
 
-        String rawPassword = req.password() != null ? req.password() : "";
-        if (rawPassword.length() < MIN_PASSWORD_LEN) {
+        String rawPassword = req.password() != null ? req.password().trim() : "";
+        if (rawPassword.isEmpty()) {
+            rawPassword = SecurePasswordGenerator.random(GENERATED_PASSWORD_LEN);
+        } else if (rawPassword.length() < MIN_PASSWORD_LEN) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Password must be at least " + MIN_PASSWORD_LEN + " characters"
+                    "Password must be at least " + MIN_PASSWORD_LEN + " characters, or leave empty to generate"
             );
         }
 
@@ -140,7 +148,14 @@ public class SchoolAdminTeachersService {
         }
         teacherSubjects.flush();
 
-        return toOption(row);
+        boolean sendInvite = req.sendInviteEmail() == null || req.sendInviteEmail();
+        boolean inviteSent = false;
+        if (sendInvite) {
+            String display = (first + " " + last).trim();
+            inviteSent = invitationMailService.sendInvite(email, display, rawPassword, email, "teacher");
+        }
+
+        return toOption(row, inviteSent);
     }
 
     /** Додає рядок у `school_subjects`, якщо такої назви ще немає (без урахування регістру). */
@@ -154,7 +169,7 @@ public class SchoolAdminTeachersService {
                 });
     }
 
-    private SchoolTeacherOptionResponse toOption(TeacherEntity t) {
+    private SchoolTeacherOptionResponse toOption(TeacherEntity t, boolean inviteEmailSent) {
         UserEntity u = t.getUser();
         String display = (u.getFirstName() + " " + u.getLastName()).trim();
         List<String> subjects = teacherSubjects.findByTeacher_IdOrderBySortOrderAsc(t.getId()).stream()
@@ -176,7 +191,8 @@ public class SchoolAdminTeachersService {
                 u.getEmail(),
                 phone,
                 subjects,
-                groups
+                groups,
+                inviteEmailSent
         );
     }
 }

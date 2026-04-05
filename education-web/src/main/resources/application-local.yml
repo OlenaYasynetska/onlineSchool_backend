@@ -4,6 +4,36 @@
 # После успешного старта профиль "local" можно убрать (repair выполняется при старте, checksum в БД обновится).
 #
 # В продакшене этот профиль не используй.
+#
+# --- Пошта (запрошення учням/вчителям) ---
+# Без MAIL_HOST листи не відправляються (див. WARN у логах).
+# Задай змінні середовища (IntelliJ → Environment variables) або підстав значення нижче тимчасово:
+#   MAIL_HOST=smtp.gmail.com
+#   MAIL_PORT=587
+#   MAIL_USERNAME=your@gmail.com
+#   MAIL_PASSWORD=app-password   # Gmail: App Password, не звичайний пароль облікового запису
+# Опційно:
+#   FRONTEND_BASE_URL=http://localhost:4200
+#
 spring:
   flyway:
     repair-on-migrate: true
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
+
+# Якщо фронт не на localhost:4200 — перевизнач тут або через FRONTEND_BASE_URL.
+app:
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:4200}
