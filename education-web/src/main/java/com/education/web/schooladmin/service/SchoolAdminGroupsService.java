@@ -31,17 +31,20 @@ public class SchoolAdminGroupsService {
     private final SchoolGroupJpaRepository schoolGroups;
     private final SchoolSubjectJpaRepository schoolSubjects;
     private final TeacherJpaRepository teachers;
+    private final GroupEnrollmentCountService groupEnrollmentCounts;
 
     public SchoolAdminGroupsService(
             OrganizationJpaRepository organizations,
             SchoolGroupJpaRepository schoolGroups,
             SchoolSubjectJpaRepository schoolSubjects,
-            TeacherJpaRepository teachers
+            TeacherJpaRepository teachers,
+            GroupEnrollmentCountService groupEnrollmentCounts
     ) {
         this.organizations = organizations;
         this.schoolGroups = schoolGroups;
         this.schoolSubjects = schoolSubjects;
         this.teachers = teachers;
+        this.groupEnrollmentCounts = groupEnrollmentCounts;
     }
 
     /**
@@ -120,7 +123,7 @@ public class SchoolAdminGroupsService {
         entity.setActive(req.active());
 
         SchoolGroupEntity saved = schoolGroups.save(entity);
-        return toCard(saved);
+        return toCard(saved, groupEnrollmentCounts.countForGroup(saved.getId()));
     }
 
     private LocalDate parseDate(String raw, String field) {
@@ -137,7 +140,7 @@ public class SchoolAdminGroupsService {
         }
     }
 
-    private SchoolGroupCardResponse toCard(SchoolGroupEntity g) {
+    private SchoolGroupCardResponse toCard(SchoolGroupEntity g, int studentsFromEnrollment) {
         String subjectId = g.getSubject() != null ? g.getSubject().getId() : null;
         String teacherId = g.getTeacher() != null ? g.getTeacher().getId() : null;
         return new SchoolGroupCardResponse(
@@ -150,7 +153,7 @@ public class SchoolAdminGroupsService {
                 g.getTopicsLabel() != null ? g.getTopicsLabel() : "",
                 g.getStartDate() != null ? OUTPUT_DATE_FMT.format(g.getStartDate()) : "—",
                 g.getEndDate() != null ? OUTPUT_DATE_FMT.format(g.getEndDate()) : "—",
-                g.getStudentsCount(),
+                studentsFromEnrollment,
                 g.getHomeworkStarsTotal(),
                 g.isActive()
         );

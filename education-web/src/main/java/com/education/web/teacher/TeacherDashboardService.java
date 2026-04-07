@@ -10,6 +10,7 @@ import com.education.web.auth.repository.SchoolGroupJpaRepository;
 import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
 import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.schooladmin.dto.SchoolGroupCardResponse;
+import com.education.web.schooladmin.service.GroupEnrollmentCountService;
 import com.education.web.schooladmin.dto.StudentRowResponse;
 import com.education.web.teacher.dto.TeacherActivityEntryResponse;
 import org.springframework.http.HttpStatus;
@@ -42,24 +43,30 @@ public class TeacherDashboardService {
     private final SchoolGroupJpaRepository schoolGroups;
     private final SchoolGroupStudentJpaRepository schoolGroupStudents;
     private final GetStudentsBySchoolUseCase getStudentsBySchoolUseCase;
+    private final GroupEnrollmentCountService groupEnrollmentCounts;
 
     public TeacherDashboardService(
             TeacherJpaRepository teachers,
             SchoolGroupJpaRepository schoolGroups,
             SchoolGroupStudentJpaRepository schoolGroupStudents,
-            GetStudentsBySchoolUseCase getStudentsBySchoolUseCase
+            GetStudentsBySchoolUseCase getStudentsBySchoolUseCase,
+            GroupEnrollmentCountService groupEnrollmentCounts
     ) {
         this.teachers = teachers;
         this.schoolGroups = schoolGroups;
         this.schoolGroupStudents = schoolGroupStudents;
         this.getStudentsBySchoolUseCase = getStudentsBySchoolUseCase;
+        this.groupEnrollmentCounts = groupEnrollmentCounts;
     }
 
     @Transactional(readOnly = true)
     public List<SchoolGroupCardResponse> listGroupsForTeacherUser(String userId) {
         TeacherEntity teacher = requireTeacher(userId);
-        return schoolGroups.findByTeacher_IdOrderByNameAsc(teacher.getId()).stream()
-                .map(this::toGroupCard)
+        List<SchoolGroupEntity> groups = schoolGroups.findByTeacher_IdOrderByNameAsc(teacher.getId());
+        Map<String, Long> counts = groupEnrollmentCounts.countsByGroupIds(
+                groups.stream().map(SchoolGroupEntity::getId).toList());
+        return groups.stream()
+                .map(g -> toGroupCard(g, counts.getOrDefault(g.getId(), 0L).intValue()))
                 .toList();
     }
 
@@ -178,7 +185,7 @@ public class TeacherDashboardService {
         return map;
     }
 
-    private SchoolGroupCardResponse toGroupCard(SchoolGroupEntity g) {
+    private SchoolGroupCardResponse toGroupCard(SchoolGroupEntity g, int studentsFromEnrollment) {
         LocalDate start = g.getStartDate();
         LocalDate end = g.getEndDate();
         String topics = g.getTopicsLabel() != null ? g.getTopicsLabel() : "";
@@ -195,7 +202,7 @@ public class TeacherDashboardService {
                 topics,
                 start != null ? DATE_FMT.format(start) : "—",
                 end != null ? DATE_FMT.format(end) : "—",
-                g.getStudentsCount(),
+                studentsFromEnrollment,
                 g.getHomeworkStarsTotal(),
                 g.isActive()
         );

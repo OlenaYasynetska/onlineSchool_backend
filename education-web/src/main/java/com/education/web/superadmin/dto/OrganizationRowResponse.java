@@ -8,7 +8,9 @@ public record OrganizationRowResponse(
         String nextBilling,
         String registered,
         String totalReceived,
-        String address
+        String address,
+        /** Кількість учнів школи з таблиці {@code students.school_id}. */
+        int studentCount
 ) {
 }
 

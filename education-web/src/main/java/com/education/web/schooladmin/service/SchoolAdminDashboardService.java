@@ -44,19 +44,22 @@ public class SchoolAdminDashboardService {
     private final OrganizationJpaRepository organizations;
     private final SchoolGroupJpaRepository schoolGroups;
     private final SchoolGroupStudentJpaRepository schoolGroupStudents;
+    private final GroupEnrollmentCountService groupEnrollmentCounts;
 
     public SchoolAdminDashboardService(
             GetStudentsBySchoolUseCase getStudentsBySchoolUseCase,
             PaymentJpaRepository payments,
             OrganizationJpaRepository organizations,
             SchoolGroupJpaRepository schoolGroups,
-            SchoolGroupStudentJpaRepository schoolGroupStudents
+            SchoolGroupStudentJpaRepository schoolGroupStudents,
+            GroupEnrollmentCountService groupEnrollmentCounts
     ) {
         this.getStudentsBySchoolUseCase = getStudentsBySchoolUseCase;
         this.payments = payments;
         this.organizations = organizations;
         this.schoolGroups = schoolGroups;
         this.schoolGroupStudents = schoolGroupStudents;
+        this.groupEnrollmentCounts = groupEnrollmentCounts;
     }
 
     @Transactional(readOnly = true)
@@ -102,10 +105,14 @@ public class SchoolAdminDashboardService {
         SchoolSubscriptionInfoResponse subscription =
                 buildSubscriptionInfo(schoolId);
 
-        List<SchoolGroupCardResponse> groupsResponse = schoolGroups
-                .findByOrganization_IdOrderByCreatedAtAsc(schoolId)
-                .stream()
-                .map(this::toGroupCard)
+        List<SchoolGroupEntity> groupEntities =
+                schoolGroups.findByOrganization_IdOrderByCreatedAtAsc(schoolId);
+        Map<String, Long> enrollmentCounts = groupEnrollmentCounts.countsByGroupIds(
+                groupEntities.stream().map(SchoolGroupEntity::getId).toList());
+        List<SchoolGroupCardResponse> groupsResponse = groupEntities.stream()
+                .map(g -> toGroupCard(
+                        g,
+                        enrollmentCounts.getOrDefault(g.getId(), 0L).intValue()))
                 .toList();
 
         return new SchoolAdminDashboardResponse(
@@ -138,7 +145,7 @@ public class SchoolAdminDashboardService {
         return map;
     }
 
-    private SchoolGroupCardResponse toGroupCard(SchoolGroupEntity g) {
+    private SchoolGroupCardResponse toGroupCard(SchoolGroupEntity g, int studentsFromEnrollment) {
         LocalDate start = g.getStartDate();
         LocalDate end = g.getEndDate();
         String topics = g.getTopicsLabel() != null ? g.getTopicsLabel() : "";
@@ -155,7 +162,7 @@ public class SchoolAdminDashboardService {
                 topics,
                 start != null ? DATE_FMT.format(start) : "—",
                 end != null ? DATE_FMT.format(end) : "—",
-                g.getStudentsCount(),
+                studentsFromEnrollment,
                 g.getHomeworkStarsTotal(),
                 g.isActive()
         );

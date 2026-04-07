@@ -12,4 +12,10 @@ public interface HomeworkPortalSubmissionJpaRepository extends JpaRepository<Hom
     );
 
     List<HomeworkPortalSubmissionEntity> findByStudentIdOrderBySubmittedAtDesc(String studentId);
+
+    List<HomeworkPortalSubmissionEntity> findByTeacherIdAndGroupIdAndStatus(
+            String teacherId,
+            String groupId,
+            String status
+    );
 }

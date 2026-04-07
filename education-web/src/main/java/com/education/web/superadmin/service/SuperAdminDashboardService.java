@@ -19,7 +19,9 @@ import java.math.RoundingMode;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -59,18 +61,20 @@ public class SuperAdminDashboardService {
                 new PlanOverviewItemResponse("free", "Plan Free", freeCount, percent(freeCount, total))
         );
 
+        Map<String, Integer> studentCountByOrgId = studentCountsByOrgId(orgs);
+
         List<SchoolCardResponse> schoolCards = new ArrayList<>();
         for (int i = 0; i < orgs.size(); i++) {
             OrganizationEntity o = orgs.get(i);
             String title = "School " + (i + 1);
-            long studentCount = students.countBySchoolId(o.getId());
+            int studentCount = studentCountByOrgId.getOrDefault(o.getId(), 0);
             schoolCards.add(new SchoolCardResponse(
                     o.getId(),
                     title,
                     schoolAdminDisplayName(o),
                     formatAddress(o),
                     planTitle(o.getPlan().getPlanKey()),
-                    (int) Math.min(studentCount, Integer.MAX_VALUE)
+                    studentCount
             ));
         }
 
@@ -83,7 +87,8 @@ public class SuperAdminDashboardService {
                         o.getNextBillingAt() == null ? "—" : o.getNextBillingAt().toLocalDate().toString(),
                         o.getRegisteredAt() == null ? "—" : DATE_FMT.format(o.getRegisteredAt().atZone(ZoneId.systemDefault()).toLocalDate()),
                         "$" + o.getTotalReceived().setScale(2, RoundingMode.HALF_UP),
-                        formatAddress(o)
+                        formatAddress(o),
+                        studentCountByOrgId.getOrDefault(o.getId(), 0)
                 ))
                 .toList();
 
@@ -98,6 +103,29 @@ public class SuperAdminDashboardService {
                 .toList();
 
         return new SuperAdminDashboardResponse(overview, schoolCards, organizationsResponse, paymentsResponse);
+    }
+
+    /**
+     * Кількість учнів по {@code students.school_id} для кожної організації.
+     * Один запит GROUP BY замість N × countBySchoolId.
+     */
+    private Map<String, Integer> studentCountsByOrgId(List<OrganizationEntity> orgs) {
+        Map<String, Integer> map = new HashMap<>();
+        if (orgs.isEmpty()) {
+            return map;
+        }
+        List<String> ids = orgs.stream().map(OrganizationEntity::getId).toList();
+        List<Object[]> rows = students.countBySchoolIdsGrouped(ids);
+        for (Object[] row : rows) {
+            if (row.length >= 2 && row[0] != null && row[1] != null) {
+                long n = ((Number) row[1]).longValue();
+                map.put((String) row[0], (int) Math.min(n, Integer.MAX_VALUE));
+            }
+        }
+        for (OrganizationEntity o : orgs) {
+            map.putIfAbsent(o.getId(), 0);
+        }
+        return map;
     }
 
     /** Помаранчева підпис на картці: ім'я адміністратора з реєстрації, інакше назва організації. */

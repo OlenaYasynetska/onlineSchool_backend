@@ -3,6 +3,7 @@ package com.education.web.teacher;
 import com.education.web.schooladmin.dto.SchoolGroupCardResponse;
 import com.education.web.schooladmin.dto.StudentRowResponse;
 import com.education.web.teacher.dto.TeacherActivityEntryResponse;
+import com.education.web.teacher.dto.TeacherGroupStatsResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -15,9 +16,14 @@ import java.util.List;
 public class TeacherDashboardController {
 
     private final TeacherDashboardService teacherDashboardService;
+    private final TeacherGroupStatsService teacherGroupStatsService;
 
-    public TeacherDashboardController(TeacherDashboardService teacherDashboardService) {
+    public TeacherDashboardController(
+            TeacherDashboardService teacherDashboardService,
+            TeacherGroupStatsService teacherGroupStatsService
+    ) {
         this.teacherDashboardService = teacherDashboardService;
+        this.teacherGroupStatsService = teacherGroupStatsService;
     }
 
     /**
@@ -39,5 +45,14 @@ public class TeacherDashboardController {
     @GetMapping("/activity")
     public List<TeacherActivityEntryResponse> myActivity(@RequestParam("userId") String userId) {
         return teacherDashboardService.listActivityForTeacherUser(userId);
+    }
+
+    /**
+     * По кожній групі вчителя: предмети з teacher_subjects (узгоджені з topics_label групи) і
+     * сума зірок з оцінених здач homework portal по кожному учню та предмету.
+     */
+    @GetMapping("/group-stats")
+    public List<TeacherGroupStatsResponse> groupStats(@RequestParam("userId") String userId) {
+        return teacherGroupStatsService.listGroupStats(userId);
     }
 }
