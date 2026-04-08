@@ -19,16 +19,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
+import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class TeacherGroupStatsService {
+
+    private static final int CHART_MONTHS = 6;
 
     private final TeacherJpaRepository teachers;
     private final SchoolGroupJpaRepository schoolGroups;
@@ -71,6 +79,12 @@ public class TeacherGroupStatsService {
                 .stream()
                 .collect(Collectors.toMap(StudentView::id, s -> s, (a, b) -> a));
 
+        List<HomeworkPortalSubmissionEntity> allGraded =
+                submissions.findByTeacherIdAndStatusOrderBySubmittedAtDesc(teacherId, "graded");
+
+        List<YearMonth> monthWindow = lastNMonths(CHART_MONTHS);
+        List<String> monthLabels = monthWindow.stream().map(this::formatMonthLabel).toList();
+
         List<SchoolGroupEntity> groups = schoolGroups.findByTeacher_IdOrderByNameAsc(teacherId);
         List<TeacherGroupStatsResponse> out = new ArrayList<>();
 
@@ -83,6 +97,14 @@ public class TeacherGroupStatsService {
             List<SchoolGroupStudentEntity> links =
                     groupStudents.findByGroup_IdOrderByStudentIdAsc(g.getId());
 
+            Set<String> studentIdsInG = links.stream()
+                    .map(SchoolGroupStudentEntity::getStudentId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+
+            List<HomeworkPortalSubmissionEntity> gradedForGroup = allGraded.stream()
+                    .filter(h -> appliesToGroup(h, g, teacherId, studentIdsInG))
+                    .toList();
+
             Map<String, Map<String, Integer>> stars = new LinkedHashMap<>();
             for (SchoolGroupStudentEntity link : links) {
                 String sid = link.getStudentId();
@@ -93,9 +115,7 @@ public class TeacherGroupStatsService {
                 stars.put(sid, row);
             }
 
-            List<HomeworkPortalSubmissionEntity> graded =
-                    submissions.findByTeacherIdAndGroupIdAndStatus(teacherId, g.getId(), "graded");
-            for (HomeworkPortalSubmissionEntity h : graded) {
+            for (HomeworkPortalSubmissionEntity h : gradedForGroup) {
                 String sid = h.getStudentId();
                 Map<String, Integer> row = stars.get(sid);
                 if (row == null) {
@@ -118,16 +138,105 @@ public class TeacherGroupStatsService {
                 studentRows.add(new TeacherGroupStudentStatRow(sid, name, new LinkedHashMap<>(row)));
             }
 
+            Map<String, List<Integer>> chartSeries = buildChartSeries(
+                    subjectTitles,
+                    gradedForGroup,
+                    monthWindow
+            );
+
             out.add(new TeacherGroupStatsResponse(
                     g.getId(),
                     g.getName(),
                     g.getCode(),
                     List.copyOf(subjectTitles),
-                    studentRows
+                    studentRows,
+                    monthLabels,
+                    chartSeries
             ));
         }
 
         return out;
+    }
+
+    /** Учёт строки ДЗ для групи: зачисление в группу + либо group_id в строке, либо одна группа у этого учителя. */
+    private boolean appliesToGroup(
+            HomeworkPortalSubmissionEntity h,
+            SchoolGroupEntity g,
+            String teacherId,
+            Set<String> studentIdsInG
+    ) {
+        if (!studentIdsInG.contains(h.getStudentId())) {
+            return false;
+        }
+        String gid = h.getGroupId();
+        if (gid != null && !gid.isBlank()) {
+            return g.getId().equals(gid);
+        }
+        Set<String> tg = teacherGroupIdsForStudent(h.getStudentId(), teacherId);
+        return tg.size() == 1 && tg.contains(g.getId());
+    }
+
+    private Set<String> teacherGroupIdsForStudent(String studentId, String teacherId) {
+        return groupStudents.findByStudentId(studentId).stream()
+                .map(SchoolGroupStudentEntity::getGroup)
+                .filter(gr -> teacherId.equals(gr.getTeacher().getId()))
+                .map(SchoolGroupEntity::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private List<YearMonth> lastNMonths(int n) {
+        YearMonth now = YearMonth.now(ZoneOffset.UTC);
+        List<YearMonth> list = new ArrayList<>();
+        for (int i = n - 1; i >= 0; i--) {
+            list.add(now.minusMonths(i));
+        }
+        return list;
+    }
+
+    private String formatMonthLabel(YearMonth ym) {
+        return ym.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH) + " " + ym.getYear();
+    }
+
+    /**
+     * Кумулятивні зірки по місяцях з БД ({@code graded_at}), по кожному предмету з таблиці.
+     */
+    private Map<String, List<Integer>> buildChartSeries(
+            List<String> subjectTitles,
+            List<HomeworkPortalSubmissionEntity> gradedForGroup,
+            List<YearMonth> monthWindow
+    ) {
+        int m = monthWindow.size();
+        int[][] raw = new int[subjectTitles.size()][m];
+        for (HomeworkPortalSubmissionEntity h : gradedForGroup) {
+            String matched = matchSubjectKey(h.getSubjectTitle(), subjectTitles);
+            if (matched == null) {
+                continue;
+            }
+            int subIdx = subjectTitles.indexOf(matched);
+            if (subIdx < 0) {
+                continue;
+            }
+            Instant when = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
+            YearMonth ym = YearMonth.from(when.atZone(ZoneOffset.UTC));
+            int mi = monthWindow.indexOf(ym);
+            if (mi < 0) {
+                continue;
+            }
+            int add = h.getStars() != null ? h.getStars() : 0;
+            raw[subIdx][mi] += add;
+        }
+        Map<String, List<Integer>> chartSeries = new LinkedHashMap<>();
+        for (int si = 0; si < subjectTitles.size(); si++) {
+            String sub = subjectTitles.get(si);
+            List<Integer> cumulative = new ArrayList<>();
+            int run = 0;
+            for (int mi = 0; mi < m; mi++) {
+                run += raw[si][mi];
+                cumulative.add(run);
+            }
+            chartSeries.put(sub, cumulative);
+        }
+        return chartSeries;
     }
 
     private TeacherEntity requireTeacher(String userId) {

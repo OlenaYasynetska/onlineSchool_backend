@@ -3,8 +3,10 @@ package com.education.web.homework;
 import com.education.infrastructure.student.SpringDataStudentJpaRepository;
 import com.education.infrastructure.student.StudentJpaEntity;
 import com.education.web.auth.model.SchoolGroupEntity;
+import com.education.web.auth.model.SchoolGroupStudentEntity;
 import com.education.web.auth.model.TeacherEntity;
 import com.education.web.auth.repository.SchoolGroupJpaRepository;
+import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
 import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.homework.dto.GradeHomeworkRequest;
 import com.education.web.homework.dto.HomeworkSubmissionResponse;
@@ -20,7 +22,9 @@ import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +34,7 @@ public class TeacherHomeworkPortalService {
     private final HomeworkPortalSubmissionJpaRepository submissions;
     private final SpringDataStudentJpaRepository students;
     private final SchoolGroupJpaRepository schoolGroups;
+    private final SchoolGroupStudentJpaRepository groupStudents;
     private final Path uploadRoot;
 
     public TeacherHomeworkPortalService(
@@ -37,15 +42,18 @@ public class TeacherHomeworkPortalService {
             HomeworkPortalSubmissionJpaRepository submissions,
             SpringDataStudentJpaRepository students,
             SchoolGroupJpaRepository schoolGroups,
+            SchoolGroupStudentJpaRepository groupStudents,
             @Value("${app.homework-upload.dir:uploads/homework}") String uploadDir
     ) {
         this.teachers = teachers;
         this.submissions = submissions;
         this.students = students;
         this.schoolGroups = schoolGroups;
+        this.groupStudents = groupStudents;
         this.uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
     }
 
+    @Transactional(readOnly = true)
     public List<HomeworkSubmissionResponse> listPending(String teacherUserId) {
         TeacherEntity t = requireTeacher(teacherUserId);
         return submissions
@@ -55,6 +63,7 @@ public class TeacherHomeworkPortalService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<HomeworkSubmissionResponse> listMyGraded(String teacherUserId) {
         TeacherEntity t = requireTeacher(teacherUserId);
         return submissions.findByTeacherIdAndStatusOrderBySubmittedAtDesc(t.getId(), "graded")
@@ -144,10 +153,7 @@ public class TeacherHomeworkPortalService {
             String studentName,
             String studentEmail
     ) {
-        String groupName = null;
-        if (s.getGroupId() != null) {
-            groupName = schoolGroups.findById(s.getGroupId()).map(SchoolGroupEntity::getName).orElse(null);
-        }
+        String groupName = resolveGroupDisplayName(s.getGroupId(), s.getStudentId(), s.getTeacherId());
         return new HomeworkSubmissionResponse(
                 s.getId(),
                 studentName,
@@ -162,5 +168,38 @@ public class TeacherHomeworkPortalService {
                 s.getSubmittedAt(),
                 s.getGradedAt()
         );
+    }
+
+    /**
+     * Назва групи з рядка здачі або з записів учня в {@code school_group_students}.
+     * Якщо {@code group_id} порожній — показуємо групи, де учень зарахований і де викладач цього ДЗ
+     * призначений на групу; інакше всі групи учня (через кому).
+     */
+    private String resolveGroupDisplayName(String submissionGroupId, String studentId, String teacherId) {
+        if (submissionGroupId != null && !submissionGroupId.isBlank()) {
+            return schoolGroups.findById(submissionGroupId).map(SchoolGroupEntity::getName).orElse(null);
+        }
+        List<SchoolGroupStudentEntity> memberships = groupStudents.findByStudentIdFetchGroup(studentId);
+        if (memberships.isEmpty()) {
+            return null;
+        }
+        Set<String> teacherGroupIds = schoolGroups.findByTeacher_IdOrderByNameAsc(teacherId).stream()
+                .map(SchoolGroupEntity::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        List<String> forThisTeacher = memberships.stream()
+                .map(SchoolGroupStudentEntity::getGroup)
+                .filter(g -> teacherGroupIds.contains(g.getId()))
+                .map(SchoolGroupEntity::getName)
+                .sorted()
+                .distinct()
+                .toList();
+        if (!forThisTeacher.isEmpty()) {
+            return String.join(", ", forThisTeacher);
+        }
+        return memberships.stream()
+                .map(m -> m.getGroup().getName())
+                .sorted()
+                .distinct()
+                .collect(Collectors.joining(", "));
     }
 }

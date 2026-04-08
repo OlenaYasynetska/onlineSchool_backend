@@ -21,5 +21,9 @@ public interface SchoolGroupStudentJpaRepository extends JpaRepository<SchoolGro
 
     List<SchoolGroupStudentEntity> findByStudentId(String studentId);
 
+    /** Участь у групах з підвантаженою сутністю групи (для відображення імені без N+1). */
+    @Query("SELECT l FROM SchoolGroupStudentEntity l JOIN FETCH l.group WHERE l.studentId = :studentId")
+    List<SchoolGroupStudentEntity> findByStudentIdFetchGroup(@Param("studentId") String studentId);
+
     List<SchoolGroupStudentEntity> findByGroup_IdOrderByStudentIdAsc(String groupId);
 }

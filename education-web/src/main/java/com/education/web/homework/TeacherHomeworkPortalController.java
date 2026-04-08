@@ -40,7 +40,7 @@ public class TeacherHomeworkPortalController {
     @PostMapping("/{submissionId}/grade")
     public HomeworkSubmissionResponse grade(
             @RequestParam("userId") String userId,
-            @PathVariable String submissionId,
+            @PathVariable("submissionId") String submissionId,
             @Valid @RequestBody GradeHomeworkRequest body
     ) {
         return service.grade(userId, submissionId, body);
@@ -49,7 +49,7 @@ public class TeacherHomeworkPortalController {
     @GetMapping("/{submissionId}/file")
     public ResponseEntity<Resource> download(
             @RequestParam("userId") String userId,
-            @PathVariable String submissionId
+            @PathVariable("submissionId") String submissionId
     ) {
         TeacherHomeworkPortalService.FileDownload fd = service.getFileDownload(userId, submissionId);
         String safe = fd.downloadFileName() != null
