@@ -1,5 +1,7 @@
 # Збірка з кореня репозиторію: onlineSchool_backend (Render: Root Directory = onlineSchool_backend)
 FROM eclipse-temurin:21-jdk-alpine AS build
+RUN echo "BUILD STARTED"
+RUN exit 1
 WORKDIR /app
 
 COPY pom.xml .
