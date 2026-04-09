@@ -12,6 +12,7 @@
 
     <artifactId>education-web</artifactId>
     <name>education-web</name>
+    <packaging>jar</packaging>
 
     <dependencies>
         <dependency>
