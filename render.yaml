@@ -1,0 +1,27 @@
+# Blueprint для Render: Web Service з Dockerfile у корені репозиторію onlineSchool_backend.
+# Секрети (MYSQL_*, JWT_SECRET) задавай у Render → Environment, не в цьому файлі.
+services:
+  - type: web
+    name: online-school-backend
+    runtime: docker
+    region: oregon
+    plan: free
+    rootDir: .
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # PORT підставляє Render автоматично — не фіксуй у Environment вручну.
+    envVars:
+      - key: FRONTEND_BASE_URL
+        sync: false
+      - key: MYSQL_HOST
+        sync: false
+      - key: MYSQL_PORT
+        value: "3306"
+      - key: MYSQL_DB
+        sync: false
+      - key: MYSQL_USER
+        sync: false
+      - key: MYSQL_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
