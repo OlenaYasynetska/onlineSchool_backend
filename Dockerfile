@@ -27,5 +27,5 @@ USER app
 COPY --from=build /app/education-web/target/*.jar app.jar
 
 EXPOSE 8080
-#ENTRYPOINT ["java", "-jar", "app.jar"]
-ENTRYPOINT ["sh", "-c", "java -jar app.jar --server.port=${PORT}"]
+# Явно передаємо порт: YAML у контейнері має бути коректним, але це гарантує підхоплення PORT на Railway.
+ENTRYPOINT ["sh", "-c", "exec java -jar app.jar --server.port=${PORT:-8080}"]
