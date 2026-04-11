@@ -89,7 +89,9 @@ public class AuthService {
     public AuthResponse login(LoginRequest request) {
         UserEntity user = users.findByEmailIgnoreCase(request.email().trim())
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
-        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        // Як і SUPER_ADMIN_PASSWORD у bootstrap — прибираємо випадкові пробіли з копіювання.
+        String password = request.password() == null ? "" : request.password().trim();
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new BadCredentialsException("Invalid email or password");
         }
         if (!user.isEnabled()) {
