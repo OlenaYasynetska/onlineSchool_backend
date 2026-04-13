@@ -36,6 +36,10 @@ public class UserEntity {
     @Column(name = "phone", length = 32)
     private String phone;
 
+    /** Нотатки лише для суперадміна (редагування школи / список адміністраторів). */
+    @Column(name = "super_admin_notes", columnDefinition = "TEXT")
+    private String superAdminNotes;
+
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "role", nullable = false, length = 32)
@@ -111,6 +115,14 @@ public class UserEntity {
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getSuperAdminNotes() {
+        return superAdminNotes;
+    }
+
+    public void setSuperAdminNotes(String superAdminNotes) {
+        this.superAdminNotes = superAdminNotes;
     }
 
     public UserRole getRole() {

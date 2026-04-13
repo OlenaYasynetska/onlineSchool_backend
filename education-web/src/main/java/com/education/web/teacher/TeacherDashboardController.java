@@ -4,11 +4,14 @@ import com.education.web.schooladmin.dto.SchoolGroupCardResponse;
 import com.education.web.schooladmin.dto.StudentRowResponse;
 import com.education.web.teacher.dto.TeacherActivityEntryResponse;
 import com.education.web.teacher.dto.TeacherGroupStatsResponse;
+import com.education.web.teacher.dto.TeacherHomeworkStarsChartResponse;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -17,13 +20,16 @@ public class TeacherDashboardController {
 
     private final TeacherDashboardService teacherDashboardService;
     private final TeacherGroupStatsService teacherGroupStatsService;
+    private final TeacherHomeworkStarsChartService teacherHomeworkStarsChartService;
 
     public TeacherDashboardController(
             TeacherDashboardService teacherDashboardService,
-            TeacherGroupStatsService teacherGroupStatsService
+            TeacherGroupStatsService teacherGroupStatsService,
+            TeacherHomeworkStarsChartService teacherHomeworkStarsChartService
     ) {
         this.teacherDashboardService = teacherDashboardService;
         this.teacherGroupStatsService = teacherGroupStatsService;
+        this.teacherHomeworkStarsChartService = teacherHomeworkStarsChartService;
     }
 
     /**
@@ -54,5 +60,18 @@ public class TeacherDashboardController {
     @GetMapping("/group-stats")
     public List<TeacherGroupStatsResponse> groupStats(@RequestParam("userId") String userId) {
         return teacherGroupStatsService.listGroupStats(userId);
+    }
+
+    /**
+     * Кумулятивні зірки з оцінених ДЗ цього вчителя по предметах (bucketLabels = дні або місяці).
+     * Два шляхи: канонічний і короткий алиас (часто плутають з «stats»).
+     */
+    @GetMapping({"/homework-stars-chart", "/homework-stats"})
+    public TeacherHomeworkStarsChartResponse homeworkStarsChart(
+            @RequestParam("userId") String userId,
+            @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return teacherHomeworkStarsChartService.chart(userId, from, to);
     }
 }

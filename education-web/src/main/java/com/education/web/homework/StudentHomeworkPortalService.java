@@ -15,6 +15,7 @@ import com.education.web.homework.dto.StarRewardLogRow;
 import com.education.web.homework.dto.StudentDashboardContextResponse;
 import com.education.web.homework.dto.StudentGroupOptionResponse;
 import com.education.web.homework.dto.StudentMyStarsResponse;
+import com.education.web.homework.dto.SubjectHomeworkProgressRow;
 import com.education.web.homework.dto.SubjectStarTotalRow;
 import com.education.web.homework.dto.TeacherOptionShortResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -120,9 +121,29 @@ public class StudentHomeworkPortalService {
     @Transactional(readOnly = true)
     public StudentMyStarsResponse myStars(String userId) {
         StudentJpaEntity st = requireStudentByUser(userId);
-        List<HomeworkPortalSubmissionEntity> graded = submissions.findByStudentIdOrderBySubmittedAtDesc(st.getId())
-                .stream()
+        List<HomeworkPortalSubmissionEntity> allSubs =
+                submissions.findByStudentIdOrderBySubmittedAtDesc(st.getId());
+        List<HomeworkPortalSubmissionEntity> graded = allSubs.stream()
                 .filter(s -> "graded".equals(s.getStatus()))
+                .toList();
+
+        Map<String, int[]> progressAgg = new LinkedHashMap<>();
+        for (HomeworkPortalSubmissionEntity h : allSubs) {
+            String subj = normalizeSubjectKey(h.getSubjectTitle());
+            int[] a = progressAgg.computeIfAbsent(subj, k -> new int[3]);
+            a[0]++;
+            if ("graded".equals(h.getStatus())) {
+                a[1]++;
+                a[2] += h.getStars() != null ? h.getStars() : 0;
+            }
+        }
+        List<SubjectHomeworkProgressRow> subjectHomeworkProgress = progressAgg.entrySet().stream()
+                .sorted((e1, e2) -> Integer.compare(e2.getValue()[0], e1.getValue()[0]))
+                .map(e -> new SubjectHomeworkProgressRow(
+                        e.getKey(),
+                        e.getValue()[0],
+                        e.getValue()[1],
+                        e.getValue()[2]))
                 .toList();
 
         int totalStars = graded.stream()
@@ -223,7 +244,8 @@ public class StudentHomeworkPortalService {
                 subjectTotals,
                 monthLabels,
                 chartSeries,
-                rewardLog
+                rewardLog,
+                subjectHomeworkProgress
         );
     }
 

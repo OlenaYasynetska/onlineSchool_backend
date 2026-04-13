@@ -5,10 +5,13 @@ import com.education.web.auth.model.PaymentEntity;
 import com.education.web.auth.model.UserEntity;
 import com.education.web.auth.repository.OrganizationJpaRepository;
 import com.education.web.auth.repository.PaymentJpaRepository;
+import com.education.web.auth.repository.SchoolSubjectJpaRepository;
+import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.auth.repository.UserJpaRepository;
 import com.education.infrastructure.student.SpringDataStudentJpaRepository;
 import com.education.web.superadmin.dto.OrganizationRowResponse;
 import com.education.web.superadmin.dto.PaymentHistoryRowResponse;
+import com.education.web.superadmin.dto.PlatformSummaryResponse;
 import com.education.web.superadmin.dto.PlanOverviewItemResponse;
 import com.education.web.superadmin.dto.SchoolCardResponse;
 import com.education.web.superadmin.dto.SuperAdminDashboardResponse;
@@ -32,17 +35,23 @@ public class SuperAdminDashboardService {
     private final PaymentJpaRepository payments;
     private final SpringDataStudentJpaRepository students;
     private final UserJpaRepository users;
+    private final TeacherJpaRepository teachers;
+    private final SchoolSubjectJpaRepository schoolSubjects;
 
     public SuperAdminDashboardService(
             OrganizationJpaRepository organizations,
             PaymentJpaRepository payments,
             SpringDataStudentJpaRepository students,
-            UserJpaRepository users
+            UserJpaRepository users,
+            TeacherJpaRepository teachers,
+            SchoolSubjectJpaRepository schoolSubjects
     ) {
         this.organizations = organizations;
         this.payments = payments;
         this.students = students;
         this.users = users;
+        this.teachers = teachers;
+        this.schoolSubjects = schoolSubjects;
     }
 
     @Transactional(readOnly = true)
@@ -102,7 +111,24 @@ public class SuperAdminDashboardService {
                 ))
                 .toList();
 
-        return new SuperAdminDashboardResponse(overview, schoolCards, organizationsResponse, paymentsResponse);
+        int totalStudents = studentCountByOrgId.values().stream().mapToInt(Integer::intValue).sum();
+        int totalSchools = orgs.size();
+        int totalTeachers = (int) Math.min(teachers.count(), Integer.MAX_VALUE);
+        int totalCourses = (int) Math.min(schoolSubjects.count(), Integer.MAX_VALUE);
+        PlatformSummaryResponse summary = new PlatformSummaryResponse(
+                totalStudents,
+                totalTeachers,
+                totalSchools,
+                totalCourses
+        );
+
+        return new SuperAdminDashboardResponse(
+                overview,
+                schoolCards,
+                organizationsResponse,
+                paymentsResponse,
+                summary
+        );
     }
 
     /**

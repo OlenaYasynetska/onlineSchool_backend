@@ -11,6 +11,8 @@ import com.education.web.auth.repository.OrganizationJpaRepository;
 import com.education.web.auth.repository.PaymentJpaRepository;
 import com.education.web.auth.repository.SchoolGroupJpaRepository;
 import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
+import com.education.web.auth.repository.SchoolSubjectJpaRepository;
+import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.schooladmin.dto.PaymentHistoryRowResponse;
 import com.education.web.schooladmin.dto.SchoolAdminDashboardResponse;
 import com.education.web.schooladmin.dto.SchoolAdminDashboardStatsResponse;
@@ -45,6 +47,8 @@ public class SchoolAdminDashboardService {
     private final SchoolGroupJpaRepository schoolGroups;
     private final SchoolGroupStudentJpaRepository schoolGroupStudents;
     private final GroupEnrollmentCountService groupEnrollmentCounts;
+    private final TeacherJpaRepository teachers;
+    private final SchoolSubjectJpaRepository schoolSubjects;
 
     public SchoolAdminDashboardService(
             GetStudentsBySchoolUseCase getStudentsBySchoolUseCase,
@@ -52,7 +56,9 @@ public class SchoolAdminDashboardService {
             OrganizationJpaRepository organizations,
             SchoolGroupJpaRepository schoolGroups,
             SchoolGroupStudentJpaRepository schoolGroupStudents,
-            GroupEnrollmentCountService groupEnrollmentCounts
+            GroupEnrollmentCountService groupEnrollmentCounts,
+            TeacherJpaRepository teachers,
+            SchoolSubjectJpaRepository schoolSubjects
     ) {
         this.getStudentsBySchoolUseCase = getStudentsBySchoolUseCase;
         this.payments = payments;
@@ -60,6 +66,8 @@ public class SchoolAdminDashboardService {
         this.schoolGroups = schoolGroups;
         this.schoolGroupStudents = schoolGroupStudents;
         this.groupEnrollmentCounts = groupEnrollmentCounts;
+        this.teachers = teachers;
+        this.schoolSubjects = schoolSubjects;
     }
 
     @Transactional(readOnly = true)
@@ -115,10 +123,16 @@ public class SchoolAdminDashboardService {
                         enrollmentCounts.getOrDefault(g.getId(), 0L).intValue()))
                 .toList();
 
+        int totalTeachers = (int) teachers.countBySchool_Id(schoolId);
+        int totalSubjects = (int) schoolSubjects.countByOrganization_Id(schoolId);
+
         return new SchoolAdminDashboardResponse(
                 schoolId,
                 new SchoolAdminDashboardStatsResponse(
                         studentViews.size(),
+                        totalTeachers,
+                        groupEntities.size(),
+                        totalSubjects,
                         paymentRows.size(),
                         paidCount,
                         totalReceived.setScale(2, RoundingMode.HALF_UP).toPlainString()

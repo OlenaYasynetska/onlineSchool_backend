@@ -6,6 +6,8 @@ public record SchoolAdminContactResponse(
         String schoolName,
         String email,
         String login,
-        String registeredAt
+        String registeredAt,
+        /** Внутрішні нотатки суперадміна про цього адміністратора. */
+        String notes
 ) {
 }

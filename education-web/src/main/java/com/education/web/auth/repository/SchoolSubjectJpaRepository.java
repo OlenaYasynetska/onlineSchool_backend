@@ -10,6 +10,8 @@ public interface SchoolSubjectJpaRepository extends JpaRepository<SchoolSubjectE
 
     List<SchoolSubjectEntity> findByOrganization_IdOrderByTitleAsc(String organizationId);
 
+    long countByOrganization_Id(String organizationId);
+
     Optional<SchoolSubjectEntity> findByIdAndOrganization_Id(String id, String organizationId);
 
     Optional<SchoolSubjectEntity> findByOrganization_IdAndTitleIgnoreCase(

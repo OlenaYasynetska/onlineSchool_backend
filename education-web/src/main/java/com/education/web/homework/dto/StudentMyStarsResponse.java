@@ -11,6 +11,7 @@ public record StudentMyStarsResponse(
         List<SubjectStarTotalRow> subjectTotals,
         List<String> chartMonthLabels,
         Map<String, List<Integer>> starsBySubjectChartSeries,
-        List<StarRewardLogRow> rewardLog
+        List<StarRewardLogRow> rewardLog,
+        List<SubjectHomeworkProgressRow> subjectHomeworkProgress
 ) {
 }
