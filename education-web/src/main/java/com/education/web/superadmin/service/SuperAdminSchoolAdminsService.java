@@ -15,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -34,12 +35,15 @@ public class SuperAdminSchoolAdminsService {
     }
 
     /**
-     * Усі акаунти з роллю ADMIN_SCHOOL (ім'я та email з реєстрації в {@link UserEntity}),
-     * до кожного підставляється назва школи з організації за {@code adminUserId}.
+     * Усі акаунти з роллю ADMIN_SCHOOL (активні та деактивовані), активні зверху.
      */
     @Transactional(readOnly = true)
     public List<SchoolAdminContactResponse> listSchoolAdmins() {
-        List<UserEntity> admins = users.findAllByRoleOrderByCreatedAtDesc(UserRole.ADMIN_SCHOOL);
+        List<UserEntity> admins = new ArrayList<>(
+                users.findAllByRoleOrderByCreatedAtDesc(UserRole.ADMIN_SCHOOL));
+        admins.sort(Comparator
+                .comparing(UserEntity::isEnabled).reversed()
+                .thenComparing(UserEntity::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())));
         List<SchoolAdminContactResponse> rows = new ArrayList<>();
         for (UserEntity u : admins) {
             String fullName = (u.getFirstName() + " " + u.getLastName()).trim();
@@ -61,7 +65,8 @@ public class SuperAdminSchoolAdminsService {
                     u.getEmail(),
                     login,
                     reg,
-                    blankToEmpty(u.getSuperAdminNotes())
+                    blankToEmpty(u.getSuperAdminNotes()),
+                    u.isEnabled()
             ));
         }
         return rows;
@@ -73,6 +78,9 @@ public class SuperAdminSchoolAdminsService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         if (user.getRole() != UserRole.ADMIN_SCHOOL) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not a school administrator");
+        }
+        if (!user.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Administrator account is deactivated");
         }
 
         String newEmail = resolveEmail(body.email(), body.login(), user.getEmail());
@@ -105,6 +113,38 @@ public class SuperAdminSchoolAdminsService {
         return toResponse(user, schoolName);
     }
 
+    /**
+     * Деактивація шкільного адміністратора: {@code enabled = false} (без видалення рядка та організації).
+     * Організація лишається з тим самим {@code adminUserId} — вхід для цього користувача вже заблоковано в {@link com.education.web.auth.service.AuthService}.
+     */
+    @Transactional
+    public void deactivateSchoolAdmin(String userId) {
+        UserEntity user = users.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (user.getRole() != UserRole.ADMIN_SCHOOL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not a school administrator");
+        }
+        if (!user.isEnabled()) {
+            return;
+        }
+        user.setEnabled(false);
+        users.save(user);
+    }
+
+    @Transactional
+    public void reactivateSchoolAdmin(String userId) {
+        UserEntity user = users.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (user.getRole() != UserRole.ADMIN_SCHOOL) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not a school administrator");
+        }
+        if (user.isEnabled()) {
+            return;
+        }
+        user.setEnabled(true);
+        users.save(user);
+    }
+
     private SchoolAdminContactResponse toResponse(UserEntity u, String schoolName) {
         String fullName = (u.getFirstName() + " " + u.getLastName()).trim();
         if (fullName.isEmpty()) {
@@ -120,7 +160,8 @@ public class SuperAdminSchoolAdminsService {
                 u.getEmail(),
                 loginFromEmail(u.getEmail()),
                 reg,
-                blankToEmpty(u.getSuperAdminNotes())
+                blankToEmpty(u.getSuperAdminNotes()),
+                u.isEnabled()
         );
     }
 

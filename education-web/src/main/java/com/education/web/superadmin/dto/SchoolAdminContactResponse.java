@@ -8,6 +8,8 @@ public record SchoolAdminContactResponse(
         String login,
         String registeredAt,
         /** Внутрішні нотатки суперадміна про цього адміністратора. */
-        String notes
+        String notes,
+        /** Чи може користувач увійти ({@code users.enabled}). */
+        boolean enabled
 ) {
 }
