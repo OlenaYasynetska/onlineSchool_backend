@@ -31,8 +31,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -47,7 +48,11 @@ import java.util.stream.Collectors;
 @Service
 public class StudentHomeworkPortalService {
 
-    private static final int CHART_MONTHS = 6;
+    /**
+     * Як {@link com.education.web.teacher.TeacherHomeworkStarsChartService}: до стільки днів у вікні —
+     * одна точка на день; інакше — по місяцях.
+     */
+    private static final int CHART_DAILY_MAX_SPAN_DAYS = 93;
 
     private final SpringDataStudentJpaRepository students;
     private final TeacherJpaRepository teachers;
@@ -83,7 +88,7 @@ public class StudentHomeworkPortalService {
         String schoolName = organizations.findById(st.getSchoolId())
                 .map(OrganizationEntity::getName)
                 .orElse("—");
-        List<StudentGroupOptionResponse> groups = groupStudents.findByStudentId(st.getId()).stream()
+        List<StudentGroupOptionResponse> groups = groupStudents.findByStudentIdFetchGroup(st.getId()).stream()
                 .map(SchoolGroupStudentEntity::getGroup)
                 .map(g -> new StudentGroupOptionResponse(g.getId(), g.getName(), g.getCode()))
                 .collect(Collectors.toList());
@@ -102,9 +107,10 @@ public class StudentHomeworkPortalService {
     }
 
     /** Групи учня з БД — зв’язок {@code school_group_students}, не через учителя. */
+    @Transactional(readOnly = true)
     public List<StudentGroupOptionResponse> listGroupsForStudent(String userId) {
         StudentJpaEntity st = requireStudentByUser(userId);
-        return groupStudents.findByStudentId(st.getId()).stream()
+        return groupStudents.findByStudentIdFetchGroup(st.getId()).stream()
                 .map(SchoolGroupStudentEntity::getGroup)
                 .map(g -> new StudentGroupOptionResponse(g.getId(), g.getName(), g.getCode()))
                 .collect(Collectors.toList());
@@ -119,7 +125,7 @@ public class StudentHomeworkPortalService {
 
     /** Зірки та журнал з оцінених ДЗ (homework_portal_submissions) для графіка й таблиць. */
     @Transactional(readOnly = true)
-    public StudentMyStarsResponse myStars(String userId) {
+    public StudentMyStarsResponse myStars(String userId, LocalDate chartFromOpt, LocalDate chartToOpt) {
         StudentJpaEntity st = requireStudentByUser(userId);
         List<HomeworkPortalSubmissionEntity> allSubs =
                 submissions.findByStudentIdOrderBySubmittedAtDesc(st.getId());
@@ -177,41 +183,115 @@ public class StudentHomeworkPortalService {
                 .map(e -> new SubjectStarTotalRow(e.getKey(), e.getValue()))
                 .toList();
 
-        List<String> subjectKeys = totalsMap.keySet().stream()
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate todayLocal = LocalDate.now(zone);
+        LocalDate rangeFrom = chartFromOpt != null ? chartFromOpt : todayLocal.withDayOfMonth(1);
+        LocalDate rangeTo = chartToOpt != null ? chartToOpt : todayLocal;
+        final LocalDate chartFrom;
+        final LocalDate chartTo;
+        if (rangeFrom.isAfter(rangeTo)) {
+            chartFrom = rangeTo;
+            chartTo = rangeFrom;
+        } else {
+            chartFrom = rangeFrom;
+            chartTo = rangeTo;
+        }
+
+        long spanDays = ChronoUnit.DAYS.between(chartFrom, chartTo) + 1;
+        boolean useDaily = spanDays <= CHART_DAILY_MAX_SPAN_DAYS;
+
+        List<HomeworkPortalSubmissionEntity> gradedInRange = graded.stream()
+                .filter(h -> {
+                    Instant when = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
+                    if (when == null) {
+                        return false;
+                    }
+                    LocalDate d = when.atZone(zone).toLocalDate();
+                    return !d.isBefore(chartFrom) && !d.isAfter(chartTo);
+                })
+                .toList();
+
+        Map<String, Integer> totalsInWindow = new LinkedHashMap<>();
+        for (HomeworkPortalSubmissionEntity h : gradedInRange) {
+            String subj = normalizeSubjectKey(h.getSubjectTitle());
+            int add = h.getStars() != null ? h.getStars() : 0;
+            totalsInWindow.merge(subj, add, Integer::sum);
+        }
+        List<String> subjectKeys = totalsInWindow.keySet().stream()
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
 
-        List<YearMonth> monthWindow = lastNMonths(CHART_MONTHS);
-        List<String> monthLabels = monthWindow.stream().map(this::formatMonthLabel).toList();
-
-        int[][] raw = new int[subjectKeys.size()][monthWindow.size()];
-        for (HomeworkPortalSubmissionEntity h : graded) {
-            String subj = normalizeSubjectKey(h.getSubjectTitle());
-            int si = subjectKeys.indexOf(subj);
-            if (si < 0) {
-                continue;
+        List<String> chartLabels;
+        Map<String, List<Integer>> chartSeries;
+        String chartGranularity;
+        if (subjectKeys.isEmpty()) {
+            chartGranularity = useDaily ? "DAY" : "MONTH";
+            if (useDaily) {
+                List<LocalDate> days = new ArrayList<>();
+                for (LocalDate d = chartFrom; !d.isAfter(chartTo); d = d.plusDays(1)) {
+                    days.add(d);
+                }
+                chartLabels = days.stream().map(StudentHomeworkPortalService::formatDayLabel).toList();
+            } else {
+                List<YearMonth> months = new ArrayList<>();
+                YearMonth startYm = YearMonth.from(chartFrom);
+                YearMonth endYm = YearMonth.from(chartTo);
+                for (YearMonth ym = startYm; !ym.isAfter(endYm); ym = ym.plusMonths(1)) {
+                    months.add(ym);
+                }
+                chartLabels = months.stream().map(this::formatMonthLabel).toList();
             }
-            Instant when = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
-            YearMonth ym = YearMonth.from(when.atZone(ZoneOffset.UTC));
-            int mi = monthWindow.indexOf(ym);
-            if (mi < 0) {
-                continue;
+            chartSeries = new LinkedHashMap<>();
+        } else if (useDaily) {
+            chartGranularity = "DAY";
+            List<LocalDate> days = new ArrayList<>();
+            for (LocalDate d = chartFrom; !d.isAfter(chartTo); d = d.plusDays(1)) {
+                days.add(d);
             }
-            int add = h.getStars() != null ? h.getStars() : 0;
-            raw[si][mi] += add;
-        }
-
-        Map<String, List<Integer>> chartSeries = new LinkedHashMap<>();
-        int m = monthWindow.size();
-        for (int si = 0; si < subjectKeys.size(); si++) {
-            String sub = subjectKeys.get(si);
-            List<Integer> cumulative = new ArrayList<>();
-            int run = 0;
-            for (int mi = 0; mi < m; mi++) {
-                run += raw[si][mi];
-                cumulative.add(run);
+            chartLabels = days.stream().map(StudentHomeworkPortalService::formatDayLabel).toList();
+            int[][] raw = new int[subjectKeys.size()][days.size()];
+            for (HomeworkPortalSubmissionEntity h : gradedInRange) {
+                String subj = normalizeSubjectKey(h.getSubjectTitle());
+                int si = subjectKeys.indexOf(subj);
+                if (si < 0) {
+                    continue;
+                }
+                Instant when = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
+                LocalDate d = when.atZone(zone).toLocalDate();
+                int di = days.indexOf(d);
+                if (di < 0) {
+                    continue;
+                }
+                int add = h.getStars() != null ? h.getStars() : 0;
+                raw[si][di] += add;
             }
-            chartSeries.put(sub, cumulative);
+            chartSeries = buildCumulativeSeries(subjectKeys, raw);
+        } else {
+            chartGranularity = "MONTH";
+            List<YearMonth> months = new ArrayList<>();
+            YearMonth startYm = YearMonth.from(chartFrom);
+            YearMonth endYm = YearMonth.from(chartTo);
+            for (YearMonth ym = startYm; !ym.isAfter(endYm); ym = ym.plusMonths(1)) {
+                months.add(ym);
+            }
+            chartLabels = months.stream().map(this::formatMonthLabel).toList();
+            int[][] raw = new int[subjectKeys.size()][months.size()];
+            for (HomeworkPortalSubmissionEntity h : gradedInRange) {
+                String subj = normalizeSubjectKey(h.getSubjectTitle());
+                int si = subjectKeys.indexOf(subj);
+                if (si < 0) {
+                    continue;
+                }
+                Instant when = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
+                YearMonth ym = YearMonth.from(when.atZone(zone));
+                int mi = months.indexOf(ym);
+                if (mi < 0) {
+                    continue;
+                }
+                int add = h.getStars() != null ? h.getStars() : 0;
+                raw[si][mi] += add;
+            }
+            chartSeries = buildCumulativeSeries(subjectKeys, raw);
         }
 
         List<StarRewardLogRow> rewardLog = graded.stream()
@@ -242,11 +322,27 @@ public class StudentHomeworkPortalService {
                 weekGain,
                 monthGain,
                 subjectTotals,
-                monthLabels,
+                chartLabels,
                 chartSeries,
                 rewardLog,
-                subjectHomeworkProgress
+                subjectHomeworkProgress,
+                chartGranularity
         );
+    }
+
+    private static Map<String, List<Integer>> buildCumulativeSeries(List<String> subjectKeys, int[][] raw) {
+        Map<String, List<Integer>> chartSeries = new LinkedHashMap<>();
+        int bucketCount = subjectKeys.isEmpty() || raw.length == 0 ? 0 : raw[0].length;
+        for (int si = 0; si < subjectKeys.size(); si++) {
+            List<Integer> cumulative = new ArrayList<>();
+            int run = 0;
+            for (int bi = 0; bi < bucketCount; bi++) {
+                run += raw[si][bi];
+                cumulative.add(run);
+            }
+            chartSeries.put(subjectKeys.get(si), cumulative);
+        }
+        return chartSeries;
     }
 
     private static String normalizeSubjectKey(String subjectTitle) {
@@ -256,17 +352,14 @@ public class StudentHomeworkPortalService {
         return subjectTitle.trim();
     }
 
-    private List<YearMonth> lastNMonths(int n) {
-        YearMonth now = YearMonth.now(ZoneOffset.UTC);
-        List<YearMonth> list = new ArrayList<>();
-        for (int i = n - 1; i >= 0; i--) {
-            list.add(now.minusMonths(i));
-        }
-        return list;
-    }
-
     private String formatMonthLabel(YearMonth ym) {
         return ym.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH) + " " + ym.getYear();
+    }
+
+    /** Як у {@link com.education.web.teacher.TeacherHomeworkStarsChartService} — підпис дня на осі X. */
+    private static String formatDayLabel(LocalDate d) {
+        return d.getDayOfMonth() + " "
+                + d.getMonth().getDisplayName(TextStyle.SHORT, Locale.ENGLISH);
     }
 
     @Transactional
@@ -286,7 +379,7 @@ public class StudentHomeworkPortalService {
         if (!teacher.getSchool().getId().equals(student.getSchoolId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Teacher is not from your school");
         }
-        var memberships = groupStudents.findByStudentId(student.getId());
+        var memberships = groupStudents.findByStudentIdFetchGroup(student.getId());
 
         String gid = groupId != null ? groupId.trim() : "";
         String groupIdToStore = null;
@@ -306,7 +399,7 @@ public class StudentHomeworkPortalService {
         } else {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "You are not enrolled in any class group. Ask your school administrator to add you to a group."
+                    "You are not enrolled in any class group. Ask your school administrator to add you under Groups in the school admin panel."
             );
         }
         String subj = subjectTitle != null ? subjectTitle.trim() : "";

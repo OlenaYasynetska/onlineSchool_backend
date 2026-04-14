@@ -178,7 +178,8 @@ public class SchoolAdminDashboardService {
                 end != null ? DATE_FMT.format(end) : "—",
                 studentsFromEnrollment,
                 g.getHomeworkStarsTotal(),
-                g.isActive()
+                g.isActive(),
+                g.isShowSubjectOnCard()
         );
     }
 

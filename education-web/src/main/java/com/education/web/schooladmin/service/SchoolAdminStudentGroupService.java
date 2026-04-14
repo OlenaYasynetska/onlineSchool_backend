@@ -57,6 +57,7 @@ public class SchoolAdminStudentGroupService {
         SchoolGroupStudentEntity row = new SchoolGroupStudentEntity();
         row.setStudentId(studentId);
         row.setGroup(group);
+        row.setChangeDelta(1);
         enrollments.save(row);
         group.setStudentsCount(group.getStudentsCount() + 1);
         schoolGroups.save(group);

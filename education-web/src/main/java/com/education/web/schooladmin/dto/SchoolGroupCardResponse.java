@@ -14,6 +14,7 @@ public record SchoolGroupCardResponse(
         int studentsCount,
         /** Сумарні зірки за ДЗ усіх учнів групи. */
         int homeworkStarsTotal,
-        boolean active
+        boolean active,
+        boolean showSubjectOnCard
 ) {
 }

@@ -121,6 +121,9 @@ public class SchoolAdminGroupsService {
         entity.setEndDate(endDate);
         entity.setStudentsCount(req.studentsCount());
         entity.setActive(req.active());
+        Boolean showFlag = req.showSubjectOnCard();
+        // null = старі клієнти / поле не передали → показувати; false → явно приховати.
+        entity.setShowSubjectOnCard(showFlag == null || showFlag);
 
         SchoolGroupEntity saved = schoolGroups.save(entity);
         return toCard(saved, groupEnrollmentCounts.countForGroup(saved.getId()));
@@ -155,7 +158,8 @@ public class SchoolAdminGroupsService {
                 g.getEndDate() != null ? OUTPUT_DATE_FMT.format(g.getEndDate()) : "—",
                 studentsFromEnrollment,
                 g.getHomeworkStarsTotal(),
-                g.isActive()
+                g.isActive(),
+                g.isShowSubjectOnCard()
         );
     }
 

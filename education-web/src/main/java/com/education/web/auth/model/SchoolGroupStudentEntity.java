@@ -30,6 +30,12 @@ public class SchoolGroupStudentEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * Для журналу активності вчителя: +1 при зарахуванні в групу (інші значення — за потреби пізніше).
+     */
+    @Column(name = "change_delta", nullable = false)
+    private int changeDelta = 1;
+
     @PrePersist
     void onCreate() {
         if (this.id == null || this.id.isBlank()) {
@@ -70,5 +76,13 @@ public class SchoolGroupStudentEntity {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public int getChangeDelta() {
+        return changeDelta;
+    }
+
+    public void setChangeDelta(int changeDelta) {
+        this.changeDelta = changeDelta;
     }
 }

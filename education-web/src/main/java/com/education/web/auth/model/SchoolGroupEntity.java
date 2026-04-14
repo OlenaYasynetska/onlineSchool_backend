@@ -33,6 +33,10 @@ public class SchoolGroupEntity {
     @Column(name = "topics_label")
     private String topicsLabel;
 
+    /** Якщо false — предмет/програма не показуються на картці, але залишаються в БД. */
+    @Column(name = "show_subject_on_card", nullable = false)
+    private boolean showSubjectOnCard = true;
+
     @ManyToOne
     @JoinColumn(name = "subject_id")
     private SchoolSubjectEntity subject;
@@ -108,6 +112,14 @@ public class SchoolGroupEntity {
 
     public void setTopicsLabel(String topicsLabel) {
         this.topicsLabel = topicsLabel;
+    }
+
+    public boolean isShowSubjectOnCard() {
+        return showSubjectOnCard;
+    }
+
+    public void setShowSubjectOnCard(boolean showSubjectOnCard) {
+        this.showSubjectOnCard = showSubjectOnCard;
     }
 
     public SchoolSubjectEntity getSubject() {

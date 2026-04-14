@@ -12,6 +12,8 @@ public record StudentMyStarsResponse(
         List<String> chartMonthLabels,
         Map<String, List<Integer>> starsBySubjectChartSeries,
         List<StarRewardLogRow> rewardLog,
-        List<SubjectHomeworkProgressRow> subjectHomeworkProgress
+        List<SubjectHomeworkProgressRow> subjectHomeworkProgress,
+        /** {@code DAY} or {@code MONTH} — як зібрані {@link #chartMonthLabels()}. */
+        String starsChartGranularity
 ) {
 }

@@ -16,7 +16,9 @@ public record CreateSchoolGroupRequest(
         String startDate,
         String endDate,
         int studentsCount,
-        boolean active
+        boolean active,
+        /** Якщо null — вважаємо true (старі клієнти). */
+        Boolean showSubjectOnCard
 ) {
 }
 

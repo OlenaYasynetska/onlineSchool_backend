@@ -126,15 +126,26 @@ public class TeacherDashboardService {
             String dateStr = at != null
                     ? ACTIVITY_DATE_DISPLAY.format(at.atZone(ZoneId.systemDefault()).toLocalDate())
                     : "—";
+            int change = link.getChangeDelta();
             out.add(new TeacherActivityEntryResponse(
                     dateStr,
                     name,
-                    1,
-                    "Joined group " + groupName
+                    change,
+                    reasonForEnrollmentChange(change, groupName)
             ));
             n++;
         }
         return out;
+    }
+
+    private static String reasonForEnrollmentChange(int change, String groupName) {
+        if (change > 0) {
+            return "Joined group " + groupName;
+        }
+        if (change < 0) {
+            return "Left group " + groupName;
+        }
+        return "Group membership update · " + groupName;
     }
 
     /**
@@ -204,7 +215,8 @@ public class TeacherDashboardService {
                 end != null ? DATE_FMT.format(end) : "—",
                 studentsFromEnrollment,
                 g.getHomeworkStarsTotal(),
-                g.isActive()
+                g.isActive(),
+                g.isShowSubjectOnCard()
         );
     }
 
