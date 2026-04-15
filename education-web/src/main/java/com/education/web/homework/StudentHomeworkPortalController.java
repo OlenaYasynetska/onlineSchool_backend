@@ -6,9 +6,12 @@ import com.education.web.homework.dto.StudentGroupOptionResponse;
 import com.education.web.homework.dto.StudentMyStarsResponse;
 import com.education.web.homework.dto.TeacherOptionShortResponse;
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.core.io.Resource;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -58,6 +61,19 @@ public class StudentHomeworkPortalController {
     @GetMapping("/submissions")
     public List<HomeworkSubmissionResponse> mySubmissions(@RequestParam("userId") @NotBlank String userId) {
         return service.listMySubmissions(userId);
+    }
+
+    /** Власне вкладення здачі: лише автор учень. */
+    @GetMapping("/submissions/{submissionId}/file")
+    public ResponseEntity<Resource> studentOwnFile(
+            @RequestParam("userId") @NotBlank String userId,
+            @PathVariable("submissionId") String submissionId,
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline
+    ) {
+        return HomeworkFileHttpResponses.toResponse(
+                service.getStudentOwnFileDownload(userId, submissionId),
+                inline
+        );
     }
 
     /** Зірки з оцінених ДЗ для таблиць і графіка на дашборді учня. */

@@ -4,8 +4,6 @@ import com.education.web.homework.dto.GradeHomeworkRequest;
 import com.education.web.homework.dto.HomeworkSubmissionResponse;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,18 +44,16 @@ public class TeacherHomeworkPortalController {
         return service.grade(userId, submissionId, body);
     }
 
+    /**
+     * Видача файлу здачі. {@code inline=true} — для перегляду в браузері (PDF/зображення);
+     * за замовчуванням — завантаження (attachment).
+     */
     @GetMapping("/{submissionId}/file")
     public ResponseEntity<Resource> download(
             @RequestParam("userId") String userId,
-            @PathVariable("submissionId") String submissionId
+            @PathVariable("submissionId") String submissionId,
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline
     ) {
-        TeacherHomeworkPortalService.FileDownload fd = service.getFileDownload(userId, submissionId);
-        String safe = fd.downloadFileName() != null
-                ? fd.downloadFileName().replace("\"", "'")
-                : "homework";
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + safe + "\"")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(fd.resource());
+        return HomeworkFileHttpResponses.toResponse(service.getFileDownload(userId, submissionId), inline);
     }
 }

@@ -20,3 +20,6 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# Локальне сховище ДЗ (див. app.homework-upload.dir у application.yml)
+uploads/

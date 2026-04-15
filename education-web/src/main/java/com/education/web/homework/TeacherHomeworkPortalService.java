@@ -9,18 +9,13 @@ import com.education.web.auth.repository.SchoolGroupJpaRepository;
 import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
 import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.homework.dto.GradeHomeworkRequest;
+import com.education.web.homework.dto.HomeworkFileDownload;
 import com.education.web.homework.dto.HomeworkSubmissionResponse;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.net.MalformedURLException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -35,7 +30,7 @@ public class TeacherHomeworkPortalService {
     private final SpringDataStudentJpaRepository students;
     private final SchoolGroupJpaRepository schoolGroups;
     private final SchoolGroupStudentJpaRepository groupStudents;
-    private final Path uploadRoot;
+    private final HomeworkSubmissionFileLoader fileLoader;
 
     public TeacherHomeworkPortalService(
             TeacherJpaRepository teachers,
@@ -43,14 +38,14 @@ public class TeacherHomeworkPortalService {
             SpringDataStudentJpaRepository students,
             SchoolGroupJpaRepository schoolGroups,
             SchoolGroupStudentJpaRepository groupStudents,
-            @Value("${app.homework-upload.dir:uploads/homework}") String uploadDir
+            HomeworkSubmissionFileLoader fileLoader
     ) {
         this.teachers = teachers;
         this.submissions = submissions;
         this.students = students;
         this.schoolGroups = schoolGroups;
         this.groupStudents = groupStudents;
-        this.uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
+        this.fileLoader = fileLoader;
     }
 
     @Transactional(readOnly = true)
@@ -103,10 +98,7 @@ public class TeacherHomeworkPortalService {
         return toResponse(s, st.getFullName(), st.getEmail());
     }
 
-    public record FileDownload(Resource resource, String downloadFileName) {
-    }
-
-    public FileDownload getFileDownload(String teacherUserId, String submissionId) {
+    public HomeworkFileDownload getFileDownload(String teacherUserId, String submissionId) {
         TeacherEntity teacher = requireTeacher(teacherUserId);
         HomeworkPortalSubmissionEntity s = submissions.findById(submissionId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found")
@@ -114,19 +106,7 @@ public class TeacherHomeworkPortalService {
         if (!teacher.getId().equals(s.getTeacherId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your submission");
         }
-        Path file = uploadRoot.resolve(s.getStoragePath());
-        if (!file.normalize().startsWith(uploadRoot.normalize())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid path");
-        }
-        try {
-            Resource resource = new UrlResource(file.toUri());
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File missing on server");
-            }
-            return new FileDownload(resource, s.getFileName());
-        } catch (MalformedURLException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
-        }
+        return fileLoader.loadForSubmission(s);
     }
 
     private TeacherEntity requireTeacher(String userId) {

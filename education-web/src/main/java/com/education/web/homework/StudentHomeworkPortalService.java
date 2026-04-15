@@ -12,6 +12,7 @@ import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
 import com.education.web.auth.model.TeacherSubjectEntity;
 import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.auth.repository.TeacherSubjectJpaRepository;
+import com.education.web.homework.dto.HomeworkFileDownload;
 import com.education.web.homework.dto.HomeworkSubmissionResponse;
 import com.education.web.homework.dto.StarRewardLogRow;
 import com.education.web.homework.dto.StudentDashboardContextResponse;
@@ -22,7 +23,6 @@ import com.education.web.homework.dto.SubjectStarTotalRow;
 import com.education.web.homework.dto.TeacherOptionShortResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +32,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -68,7 +67,7 @@ public class StudentHomeworkPortalService {
     private final OrganizationJpaRepository organizations;
     private final TeacherSubjectJpaRepository teacherSubjects;
 
-    private final Path uploadRoot;
+    private final HomeworkSubmissionFileLoader fileLoader;
 
     public StudentHomeworkPortalService(
             SpringDataStudentJpaRepository students,
@@ -78,7 +77,7 @@ public class StudentHomeworkPortalService {
             HomeworkPortalSubmissionJpaRepository submissions,
             OrganizationJpaRepository organizations,
             TeacherSubjectJpaRepository teacherSubjects,
-            @Value("${app.homework-upload.dir:uploads/homework}") String uploadDir
+            HomeworkSubmissionFileLoader fileLoader
     ) {
         this.students = students;
         this.teachers = teachers;
@@ -87,7 +86,19 @@ public class StudentHomeworkPortalService {
         this.submissions = submissions;
         this.organizations = organizations;
         this.teacherSubjects = teacherSubjects;
-        this.uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
+        this.fileLoader = fileLoader;
+    }
+
+    /** Завантаження / перегляд власного вкладення учнем (лише своя здача). */
+    public HomeworkFileDownload getStudentOwnFileDownload(String userId, String submissionId) {
+        StudentJpaEntity student = requireStudentByUser(userId);
+        HomeworkPortalSubmissionEntity s = submissions.findById(submissionId).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found")
+        );
+        if (!student.getId().equals(s.getStudentId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your submission");
+        }
+        return fileLoader.loadForSubmission(s);
     }
 
     /** Назва школи та зараховані групи — з БД. */
@@ -482,6 +493,7 @@ public class StudentHomeworkPortalService {
         row.setStatus("submitted");
         row.setSubmittedAt(Instant.now());
 
+        Path uploadRoot = fileLoader.getUploadRoot();
         Path target = uploadRoot.resolve(relativePath);
         try {
             Files.createDirectories(target.getParent());

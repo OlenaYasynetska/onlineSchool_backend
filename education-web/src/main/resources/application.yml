@@ -40,9 +40,10 @@ logging:
 
 # Посилання у листі-запрошенні (сторінка логіну фронтенду).
 app:
-  # CORS: Vercel → Railway — задайте точний origin фронту (через кому). Порожньо = дозволити всі (*).
+  # CORS: прод — CORS_ALLOWED_ORIGINS=https://your-app.vercel.app (через кому). Dev: merge localhost + credentials.
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+    merge-localhost: ${CORS_MERGE_LOCALHOST:true}
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:4200}
   # У Docker/Railway без volume користувач app часто не може створити /app/uploads — тоді задайте HOMEWORK_UPLOAD_DIR
