@@ -35,6 +35,7 @@ public class CorsConfig {
                 origins.add(t);
             }
         }
+        
         if (mergeLocalhost) {
             origins.add("http://localhost:4200");
             origins.add("http://127.0.0.1:4200");
