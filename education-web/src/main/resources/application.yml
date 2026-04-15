@@ -42,6 +42,7 @@ logging:
 app:
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:4200}
+  # У Docker/Railway: задайте writable шлях (volume) або /tmp/homework — інакше IOException при збереженні файлу.
   homework-upload:
     dir: ${HOMEWORK_UPLOAD_DIR:uploads/homework}
   # Суперадмін для POST /api/auth/login (пароль лише на сервері, напр. Railway → SUPER_ADMIN_PASSWORD).

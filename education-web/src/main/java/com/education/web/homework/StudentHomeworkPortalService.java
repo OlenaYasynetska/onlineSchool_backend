@@ -18,6 +18,8 @@ import com.education.web.homework.dto.StudentMyStarsResponse;
 import com.education.web.homework.dto.SubjectHomeworkProgressRow;
 import com.education.web.homework.dto.SubjectStarTotalRow;
 import com.education.web.homework.dto.TeacherOptionShortResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class StudentHomeworkPortalService {
+
+    private static final Logger log = LoggerFactory.getLogger(StudentHomeworkPortalService.class);
 
     /**
      * Як {@link com.education.web.teacher.TeacherHomeworkStarsChartService}: до стільки днів у вікні —
@@ -448,9 +452,20 @@ public class StudentHomeworkPortalService {
                 Files.write(target, new byte[0]);
             }
         } catch (IOException e) {
+            log.error(
+                    "Homework upload failed (dir={}): {}",
+                    uploadRoot,
+                    e.toString(),
+                    e
+            );
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Could not save file: " + e.getMessage()
+                    "Could not save file. "
+                            + "Set HOMEWORK_UPLOAD_DIR to a writable folder (e.g. /tmp/homework or a mounted volume). "
+                            + "Current path: "
+                            + uploadRoot
+                            + ". "
+                            + e.getMessage()
             );
         }
 
