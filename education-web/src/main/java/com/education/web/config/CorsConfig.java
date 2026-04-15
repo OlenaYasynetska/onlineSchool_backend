@@ -17,10 +17,10 @@ public class CorsConfig {
 
     /**
      * <p>{@code CORS_ALLOWED_ORIGINS} — через кому (прод: URL фронту на Vercel тощо).</p>
-     * <p>Якщо {@code merge-localhost=true}, додаються {@code http://localhost:4200} та
-     * {@code http://127.0.0.1:4200} для Angular dev server.</p>
-     * <p>Якщо після об’єднання список непорожній — {@code allowCredentials(true)} (не сумісно з wildcard "*").</p>
-     * <p>Якщо список порожній і merge вимкнено — fallback: "*" та credentials false (як раніше).</p>
+     * <p>Якщо в env задано хоча б один origin і {@code merge-localhost=true}, додаються
+     * {@code http://localhost:4200} та {@code http://127.0.0.1:4200}.</p>
+     * <p>Якщо {@code CORS_ALLOWED_ORIGINS} порожній — fallback: {@code *} та {@code credentials=false}.</p>
+     * <p>Якщо список explicit origin непорожній — {@code allowCredentials(true)} (не сумісно з wildcard "*").</p>
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource(
@@ -28,22 +28,28 @@ public class CorsConfig {
             @Value("${app.cors.merge-localhost:true}") boolean mergeLocalhost
     ) {
         CorsConfiguration config = new CorsConfiguration();
-        Set<String> origins = new LinkedHashSet<>();
+        Set<String> fromEnv = new LinkedHashSet<>();
         for (String part : allowedOriginsRaw.split(",")) {
             String t = part.trim();
             if (!t.isEmpty()) {
-                origins.add(t);
+                fromEnv.add(t);
             }
         }
-        
-        if (mergeLocalhost) {
-            origins.add("http://localhost:4200");
-            origins.add("http://127.0.0.1:4200");
-        }
-        if (origins.isEmpty()) {
+
+        /*
+         * Раніше при порожньому CORS_ALLOWED_ORIGINS і merge-localhost=true у список потрапляли лише
+         * localhost — прод (напр. Vercel) отримував Invalid CORS / 403. Явні origin з env збираються
+         * окремо; merge-localhost застосовується лише коли env не порожній.
+         */
+        if (fromEnv.isEmpty()) {
             config.setAllowedOriginPatterns(List.of("*"));
             config.setAllowCredentials(false);
         } else {
+            Set<String> origins = new LinkedHashSet<>(fromEnv);
+            if (mergeLocalhost) {
+                origins.add("http://localhost:4200");
+                origins.add("http://127.0.0.1:4200");
+            }
             config.setAllowedOrigins(new ArrayList<>(origins));
             config.setAllowCredentials(true);
         }
