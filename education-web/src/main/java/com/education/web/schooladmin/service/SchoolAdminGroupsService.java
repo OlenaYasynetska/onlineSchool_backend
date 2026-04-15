@@ -24,6 +24,8 @@ import java.util.Optional;
 @Service
 public class SchoolAdminGroupsService {
 
+    private static final int MAX_GROUP_CODE_LENGTH = 255;
+
     private static final DateTimeFormatter INPUT_DATE_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy");
     private static final DateTimeFormatter OUTPUT_DATE_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
@@ -63,6 +65,12 @@ public class SchoolAdminGroupsService {
         String code = req.code() != null ? req.code().trim() : "";
         if (code.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing code");
+        }
+        if (code.length() > MAX_GROUP_CODE_LENGTH) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Group code is too long (max " + MAX_GROUP_CODE_LENGTH + " characters)"
+            );
         }
 
         String name = req.name() != null ? req.name().trim() : "";

@@ -27,7 +27,7 @@ public class SchoolGroupEntity {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "code", nullable = false, length = 64)
+    @Column(name = "code", nullable = false, length = 255)
     private String code;
 
     @Column(name = "topics_label")
