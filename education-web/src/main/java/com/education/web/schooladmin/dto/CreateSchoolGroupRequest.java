@@ -1,5 +1,7 @@
 package com.education.web.schooladmin.dto;
 
+import java.util.Optional;
+
 /**
  * Запит на створення групи (класу) для конкретної школи.
  *
@@ -18,7 +20,12 @@ public record CreateSchoolGroupRequest(
         int studentsCount,
         boolean active,
         /** Якщо null — вважаємо true (старі клієнти). */
-        Boolean showSubjectOnCard
+        Boolean showSubjectOnCard,
+        /**
+         * Якщо задано — оновити існуючу групу за первинним ключем (редагування в UI).
+         * Інакше логіка як раніше: upsert за парою (organization_id, code).
+         */
+        Optional<String> groupId
 ) {
 }
 

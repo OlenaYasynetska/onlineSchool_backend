@@ -50,8 +50,9 @@ public class SchoolAdminGroupsService {
     }
 
     /**
-     * Create (upsert) group for a school.
-     * If (organization_id, code) already exists - we update existing record.
+     * Створити групу або оновити за парою (organization_id, code).
+     * Якщо в тілі передано {@code groupId} — оновити існуючий рядок за id (редагування);
+     * інакше при зміні поля code upsert за code створив би другу групу замість перезапису.
      */
     @Transactional
     public SchoolGroupCardResponse createGroup(String schoolId, CreateSchoolGroupRequest req) {
@@ -61,6 +62,70 @@ public class SchoolAdminGroupsService {
 
         LocalDate startDate = parseDate(req.startDate(), "startDate");
         LocalDate endDate = parseDate(req.endDate(), "endDate");
+
+        String groupIdRaw = req.groupId()
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .orElse("");
+        SchoolGroupEntity entity;
+
+        if (!groupIdRaw.isBlank()) {
+            entity = schoolGroups.findById(groupIdRaw)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Group not found"));
+            if (!entity.getOrganization().getId().equals(schoolId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group does not belong to this school");
+            }
+            String newCode = req.code() != null ? req.code().trim() : "";
+            if (!newCode.equals(entity.getCode())) {
+                schoolGroups.findByOrganization_IdAndCode(schoolId, newCode)
+                        .filter(g -> !g.getId().equals(groupIdRaw))
+                        .ifPresent(ignored -> {
+                            throw new ResponseStatusException(
+                                    HttpStatus.BAD_REQUEST,
+                                    "Group code already exists for this school"
+                            );
+                        });
+            }
+        } else {
+            String code = req.code() != null ? req.code().trim() : "";
+            if (code.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing code");
+            }
+            if (code.length() > MAX_GROUP_CODE_LENGTH) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Group code is too long (max " + MAX_GROUP_CODE_LENGTH + " characters)"
+                );
+            }
+
+            Optional<SchoolGroupEntity> existingOpt =
+                    schoolGroups.findByOrganization_IdAndCode(schoolId, code);
+
+            entity = existingOpt.orElseGet(() -> {
+                SchoolGroupEntity e = new SchoolGroupEntity();
+                e.setOrganization(org);
+                return e;
+            });
+        }
+
+        applyPayloadToEntity(entity, schoolId, req, startDate, endDate);
+
+        SchoolGroupEntity saved = schoolGroups.save(entity);
+        return toCard(saved, groupEnrollmentCounts.countForGroup(saved.getId()));
+    }
+
+    private void applyPayloadToEntity(
+            SchoolGroupEntity entity,
+            String schoolId,
+            CreateSchoolGroupRequest req,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        String name = req.name() != null ? req.name().trim() : "";
+        if (name.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing name");
+        }
+        entity.setName(name);
 
         String code = req.code() != null ? req.code().trim() : "";
         if (code.isBlank()) {
@@ -72,22 +137,6 @@ public class SchoolAdminGroupsService {
                     "Group code is too long (max " + MAX_GROUP_CODE_LENGTH + " characters)"
             );
         }
-
-        String name = req.name() != null ? req.name().trim() : "";
-        if (name.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing name");
-        }
-
-        Optional<SchoolGroupEntity> existingOpt =
-                schoolGroups.findByOrganization_IdAndCode(schoolId, code);
-
-        SchoolGroupEntity entity = existingOpt.orElseGet(() -> {
-            SchoolGroupEntity e = new SchoolGroupEntity();
-            e.setOrganization(org);
-            return e;
-        });
-
-        entity.setName(name);
         entity.setCode(code);
 
         String topicsTrimmed = req.topicsLabel() == null ? "" : req.topicsLabel().trim();
@@ -130,11 +179,7 @@ public class SchoolAdminGroupsService {
         entity.setStudentsCount(req.studentsCount());
         entity.setActive(req.active());
         Boolean showFlag = req.showSubjectOnCard();
-        // null = старі клієнти / поле не передали → показувати; false → явно приховати.
         entity.setShowSubjectOnCard(showFlag == null || showFlag);
-
-        SchoolGroupEntity saved = schoolGroups.save(entity);
-        return toCard(saved, groupEnrollmentCounts.countForGroup(saved.getId()));
     }
 
     private LocalDate parseDate(String raw, String field) {
