@@ -40,6 +40,15 @@ public class StudentHomeworkPortalController {
         return service.listGroupsForStudent(userId);
     }
 
+    /** Предмети вчителя з teacher_subjects (для випадаючого списку на формі здачі ДЗ). */
+    @GetMapping("/teacher-subjects")
+    public List<String> teacherSubjects(
+            @RequestParam("userId") @NotBlank String userId,
+            @RequestParam("teacherId") @NotBlank String teacherId
+    ) {
+        return service.listSubjectTitlesForTeacher(userId, teacherId);
+    }
+
     /** Школа та групи учня (організація + school_group_students). */
     @GetMapping("/dashboard-context")
     public StudentDashboardContextResponse dashboardContext(@RequestParam("userId") @NotBlank String userId) {

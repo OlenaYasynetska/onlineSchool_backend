@@ -9,7 +9,9 @@ import com.education.web.auth.model.TeacherEntity;
 import com.education.web.auth.repository.OrganizationJpaRepository;
 import com.education.web.auth.repository.SchoolGroupJpaRepository;
 import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
+import com.education.web.auth.model.TeacherSubjectEntity;
 import com.education.web.auth.repository.TeacherJpaRepository;
+import com.education.web.auth.repository.TeacherSubjectJpaRepository;
 import com.education.web.homework.dto.HomeworkSubmissionResponse;
 import com.education.web.homework.dto.StarRewardLogRow;
 import com.education.web.homework.dto.StudentDashboardContextResponse;
@@ -64,6 +66,7 @@ public class StudentHomeworkPortalService {
     private final SchoolGroupJpaRepository schoolGroups;
     private final HomeworkPortalSubmissionJpaRepository submissions;
     private final OrganizationJpaRepository organizations;
+    private final TeacherSubjectJpaRepository teacherSubjects;
 
     private final Path uploadRoot;
 
@@ -74,6 +77,7 @@ public class StudentHomeworkPortalService {
             SchoolGroupJpaRepository schoolGroups,
             HomeworkPortalSubmissionJpaRepository submissions,
             OrganizationJpaRepository organizations,
+            TeacherSubjectJpaRepository teacherSubjects,
             @Value("${app.homework-upload.dir:uploads/homework}") String uploadDir
     ) {
         this.students = students;
@@ -82,6 +86,7 @@ public class StudentHomeworkPortalService {
         this.schoolGroups = schoolGroups;
         this.submissions = submissions;
         this.organizations = organizations;
+        this.teacherSubjects = teacherSubjects;
         this.uploadRoot = Paths.get(uploadDir).toAbsolutePath().normalize();
     }
 
@@ -107,6 +112,26 @@ public class StudentHomeworkPortalService {
                     String dn = (u.getFirstName() + " " + u.getLastName()).trim();
                     return new TeacherOptionShortResponse(t.getId(), dn);
                 })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Предмети з {@code teacher_subjects} для обраного вчителя (та сама школа, що й у учня).
+     */
+    @Transactional(readOnly = true)
+    public List<String> listSubjectTitlesForTeacher(String userId, String teacherId) {
+        StudentJpaEntity st = requireStudentByUser(userId);
+        if (teacherId == null || teacherId.isBlank()) {
+            return List.of();
+        }
+        TeacherEntity teacher = teachers
+                .findByIdAndSchool_Id(teacherId.trim(), st.getSchoolId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Teacher not found"));
+        return teacherSubjects.findByTeacher_IdOrderBySortOrderAsc(teacher.getId()).stream()
+                .map(TeacherSubjectEntity::getTitle)
+                .filter(t -> t != null && !t.isBlank())
+                .map(String::trim)
+                .distinct()
                 .collect(Collectors.toList());
     }
 
@@ -409,6 +434,20 @@ public class StudentHomeworkPortalService {
         String subj = subjectTitle != null ? subjectTitle.trim() : "";
         if (subj.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Subject is required");
+        }
+        List<TeacherSubjectEntity> assignedSubjects =
+                teacherSubjects.findByTeacher_IdOrderBySortOrderAsc(teacher.getId());
+        if (!assignedSubjects.isEmpty()) {
+            boolean allowed = assignedSubjects.stream()
+                    .map(TeacherSubjectEntity::getTitle)
+                    .filter(t -> t != null && !t.isBlank())
+                    .anyMatch(t -> t.trim().equalsIgnoreCase(subj));
+            if (!allowed) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Subject must be one of this teacher's subjects"
+                );
+            }
         }
 
         String submissionId = UUID.randomUUID().toString();
