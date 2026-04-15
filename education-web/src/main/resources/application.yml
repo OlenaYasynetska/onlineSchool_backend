@@ -40,6 +40,9 @@ logging:
 
 # Посилання у листі-запрошенні (сторінка логіну фронтенду).
 app:
+  # CORS: Vercel → Railway — задайте точний origin фронту (через кому). Порожньо = дозволити всі (*).
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:4200}
   # У Docker/Railway: задайте writable шлях (volume) або /tmp/homework — інакше IOException при збереженні файлу.
