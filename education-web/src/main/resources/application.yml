@@ -45,9 +45,10 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:4200}
-  # У Docker/Railway: задайте writable шлях (volume) або /tmp/homework — інакше IOException при збереженні файлу.
+  # У Docker/Railway без volume користувач app часто не може створити /app/uploads — тоді задайте HOMEWORK_UPLOAD_DIR
+  # або залиште дефолт: tmpdir JVM (завжди доступний для запису).
   homework-upload:
-    dir: ${HOMEWORK_UPLOAD_DIR:uploads/homework}
+    dir: ${HOMEWORK_UPLOAD_DIR:${java.io.tmpdir}/education-homework}
   # Суперадмін для POST /api/auth/login (пароль лише на сервері, напр. Railway → SUPER_ADMIN_PASSWORD).
   # Якщо SUPER_ADMIN_PASSWORD порожній — запис не створюється і не оновлюється.
   super-admin:
