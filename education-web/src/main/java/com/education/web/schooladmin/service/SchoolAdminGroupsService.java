@@ -60,10 +60,10 @@ public class SchoolAdminGroupsService {
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "School not found")
         );
 
-        LocalDate startDate = parseDate(req.startDate(), "startDate");
-        LocalDate endDate = parseDate(req.endDate(), "endDate");
+        LocalDate startDate = parseDate(req.getStartDate(), "startDate");
+        LocalDate endDate = parseDate(req.getEndDate(), "endDate");
 
-        String groupIdRaw = req.groupId()
+        String groupIdRaw = Optional.ofNullable(req.getGroupId())
                 .map(String::trim)
                 .filter(s -> !s.isBlank())
                 .orElse("");
@@ -75,7 +75,7 @@ public class SchoolAdminGroupsService {
             if (!entity.getOrganization().getId().equals(schoolId)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Group does not belong to this school");
             }
-            String newCode = req.code() != null ? req.code().trim() : "";
+            String newCode = req.getCode() != null ? req.getCode().trim() : "";
             if (!newCode.equals(entity.getCode())) {
                 schoolGroups.findByOrganization_IdAndCode(schoolId, newCode)
                         .filter(g -> !g.getId().equals(groupIdRaw))
@@ -87,7 +87,7 @@ public class SchoolAdminGroupsService {
                         });
             }
         } else {
-            String code = req.code() != null ? req.code().trim() : "";
+            String code = req.getCode() != null ? req.getCode().trim() : "";
             if (code.isBlank()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing code");
             }
@@ -121,13 +121,13 @@ public class SchoolAdminGroupsService {
             LocalDate startDate,
             LocalDate endDate
     ) {
-        String name = req.name() != null ? req.name().trim() : "";
+        String name = req.getName() != null ? req.getName().trim() : "";
         if (name.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing name");
         }
         entity.setName(name);
 
-        String code = req.code() != null ? req.code().trim() : "";
+        String code = req.getCode() != null ? req.getCode().trim() : "";
         if (code.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing code");
         }
@@ -139,8 +139,8 @@ public class SchoolAdminGroupsService {
         }
         entity.setCode(code);
 
-        String topicsTrimmed = req.topicsLabel() == null ? "" : req.topicsLabel().trim();
-        String sid = req.subjectId() != null ? req.subjectId().trim() : "";
+        String topicsTrimmed = req.getTopicsLabel() == null ? "" : req.getTopicsLabel().trim();
+        String sid = req.getSubjectId() != null ? req.getSubjectId().trim() : "";
         if (!sid.isBlank()) {
             SchoolSubjectEntity subj = schoolSubjects
                     .findByIdAndOrganization_Id(sid, schoolId)
@@ -161,7 +161,7 @@ public class SchoolAdminGroupsService {
             entity.setTopicsLabel(topicsTrimmed);
         }
 
-        String tid = req.teacherId() != null ? req.teacherId().trim() : "";
+        String tid = req.getTeacherId() != null ? req.getTeacherId().trim() : "";
         if (!tid.isBlank()) {
             TeacherEntity teacher = teachers
                     .findByIdAndSchool_Id(tid, schoolId)
@@ -176,9 +176,9 @@ public class SchoolAdminGroupsService {
 
         entity.setStartDate(startDate);
         entity.setEndDate(endDate);
-        entity.setStudentsCount(req.studentsCount());
-        entity.setActive(req.active());
-        Boolean showFlag = req.showSubjectOnCard();
+        entity.setStudentsCount(req.getStudentsCount());
+        entity.setActive(req.isActive());
+        Boolean showFlag = req.getShowSubjectOnCard();
         entity.setShowSubjectOnCard(showFlag == null || showFlag);
     }
 
