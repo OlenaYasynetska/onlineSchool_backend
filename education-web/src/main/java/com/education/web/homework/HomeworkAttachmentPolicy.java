@@ -29,4 +29,16 @@ final class HomeworkAttachmentPolicy {
         }
         return true;
     }
+
+    static boolean hasSupplementaryDownloadableAttachment(HomeworkPortalSubmissionEntity s) {
+        String path = s.getSupplementaryStoragePath();
+        if (path == null || path.isBlank()) {
+            return false;
+        }
+        String fn = s.getSupplementaryFileName();
+        if (fn == null || fn.isBlank()) {
+            return false;
+        }
+        return true;
+    }
 }

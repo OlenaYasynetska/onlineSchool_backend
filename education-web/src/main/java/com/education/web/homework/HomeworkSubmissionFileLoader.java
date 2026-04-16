@@ -31,10 +31,31 @@ public class HomeworkSubmissionFileLoader {
     }
 
     public HomeworkFileDownload loadForSubmission(HomeworkPortalSubmissionEntity s) {
+        return loadForSubmission(s, false);
+    }
+
+    /**
+     * @param supplementary {@code true} — другий файл здачі; {@code false} — основний.
+     */
+    public HomeworkFileDownload loadForSubmission(HomeworkPortalSubmissionEntity s, boolean supplementary) {
+        if (supplementary) {
+            if (!HomeworkAttachmentPolicy.hasSupplementaryDownloadableAttachment(s)) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No supplementary file on this submission");
+            }
+            return loadFromRelativePath(
+                    s.getSupplementaryStoragePath(),
+                    s.getSupplementaryFileName(),
+                    s.getSupplementaryContentType()
+            );
+        }
         if (!HomeworkAttachmentPolicy.hasDownloadableAttachment(s)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No file attached to this submission");
         }
-        Path file = uploadRoot.resolve(s.getStoragePath());
+        return loadFromRelativePath(s.getStoragePath(), s.getFileName(), s.getContentType());
+    }
+
+    private HomeworkFileDownload loadFromRelativePath(String relativePath, String displayName, String contentType) {
+        Path file = uploadRoot.resolve(relativePath);
         if (!file.normalize().startsWith(uploadRoot)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid path");
         }
@@ -43,8 +64,8 @@ public class HomeworkSubmissionFileLoader {
             if (!resource.exists() || !resource.isReadable()) {
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File missing on server");
             }
-            String name = s.getFileName() != null ? s.getFileName().trim() : "homework";
-            return new HomeworkFileDownload(resource, name, file, s.getContentType());
+            String name = displayName != null ? displayName.trim() : "homework";
+            return new HomeworkFileDownload(resource, name, file, contentType);
         } catch (MalformedURLException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }

@@ -98,7 +98,7 @@ public class TeacherHomeworkPortalService {
         return toResponse(s, st.getFullName(), st.getEmail());
     }
 
-    public HomeworkFileDownload getFileDownload(String teacherUserId, String submissionId) {
+    public HomeworkFileDownload getFileDownload(String teacherUserId, String submissionId, boolean supplementary) {
         TeacherEntity teacher = requireTeacher(teacherUserId);
         HomeworkPortalSubmissionEntity s = submissions.findById(submissionId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found")
@@ -106,7 +106,7 @@ public class TeacherHomeworkPortalService {
         if (!teacher.getId().equals(s.getTeacherId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your submission");
         }
-        return fileLoader.loadForSubmission(s);
+        return fileLoader.loadForSubmission(s, supplementary);
     }
 
     private TeacherEntity requireTeacher(String userId) {
@@ -147,7 +147,8 @@ public class TeacherHomeworkPortalService {
                 groupName,
                 s.getSubmittedAt(),
                 s.getGradedAt(),
-                s.getHomeworkNumber()
+                s.getHomeworkNumber(),
+                s.getSupplementaryFileName()
         );
     }
 

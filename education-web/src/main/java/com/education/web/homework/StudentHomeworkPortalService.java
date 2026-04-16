@@ -90,7 +90,11 @@ public class StudentHomeworkPortalService {
     }
 
     /** Завантаження / перегляд власного вкладення учнем (лише своя здача). */
-    public HomeworkFileDownload getStudentOwnFileDownload(String userId, String submissionId) {
+    public HomeworkFileDownload getStudentOwnFileDownload(
+            String userId,
+            String submissionId,
+            boolean supplementary
+    ) {
         StudentJpaEntity student = requireStudentByUser(userId);
         HomeworkPortalSubmissionEntity s = submissions.findById(submissionId).orElseThrow(
                 () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found")
@@ -98,7 +102,7 @@ public class StudentHomeworkPortalService {
         if (!student.getId().equals(s.getStudentId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your submission");
         }
-        return fileLoader.loadForSubmission(s);
+        return fileLoader.loadForSubmission(s, supplementary);
     }
 
     /** Назва школи та зараховані групи — з БД. */
@@ -530,6 +534,84 @@ public class StudentHomeworkPortalService {
         return toResponse(row, student.getFullName(), student.getEmail());
     }
 
+    /**
+     * Додати текст і/або другий файл до здачі зі статусом {@code submitted} (до перевірки вчителем).
+     */
+    @Transactional
+    public HomeworkSubmissionResponse supplement(
+            String userId,
+            String submissionId,
+            String extraMessage,
+            MultipartFile file
+    ) {
+        StudentJpaEntity student = requireStudentByUser(userId);
+        HomeworkPortalSubmissionEntity row = submissions.findById(submissionId).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Submission not found")
+        );
+        if (!student.getId().equals(row.getStudentId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your submission");
+        }
+        if (!"submitted".equals(row.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "You can only add to work that is still awaiting review (status: submitted)"
+            );
+        }
+
+        boolean hasMsg = extraMessage != null && !extraMessage.trim().isEmpty();
+        boolean hasFile = file != null && !file.isEmpty() && !isNoAttachmentPlaceholder(file);
+        if (!hasMsg && !hasFile) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Add a note or attach a file");
+        }
+
+        if (hasMsg) {
+            String existing = row.getMessageText() != null ? row.getMessageText() : "";
+            String add = "\n\n— Additional note (" + Instant.now() + "): " + extraMessage.trim();
+            row.setMessageText(existing.isEmpty() ? add.trim() : existing + add);
+        }
+
+        if (hasFile) {
+            Path uploadRoot = fileLoader.getUploadRoot();
+            if (row.getSupplementaryStoragePath() != null && !row.getSupplementaryStoragePath().isBlank()) {
+                try {
+                    Path old = uploadRoot.resolve(row.getSupplementaryStoragePath());
+                    if (old.normalize().startsWith(uploadRoot)) {
+                        Files.deleteIfExists(old);
+                    }
+                } catch (IOException e) {
+                    log.warn("Could not delete previous supplementary file: {}", e.toString());
+                }
+            }
+            String orig = file.getOriginalFilename() != null ? file.getOriginalFilename() : "file";
+            String safe = safeFileName(orig);
+            String storedFileName = "supplementary_" + UUID.randomUUID() + "_" + safe;
+            String relativePath = submissionId + "/" + storedFileName;
+            row.setSupplementaryFileName(orig);
+            row.setSupplementaryStoragePath(relativePath);
+            row.setSupplementaryContentType(file.getContentType());
+            row.setSupplementaryFileSizeBytes(file.getSize());
+
+            Path target = uploadRoot.resolve(relativePath);
+            try {
+                Files.createDirectories(target.getParent());
+                Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                log.error("Supplementary upload failed (dir={}): {}", uploadRoot, e.toString(), e);
+                throw new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Could not save file. "
+                                + "Set HOMEWORK_UPLOAD_DIR to a writable folder. Current path: "
+                                + uploadRoot
+                                + ". "
+                                + e.getMessage()
+                );
+            }
+        }
+
+        submissions.save(row);
+        return toResponse(row, student.getFullName(), student.getEmail());
+    }
+
     private StudentJpaEntity requireStudentByUser(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing userId");
@@ -564,7 +646,8 @@ public class StudentHomeworkPortalService {
                 groupName,
                 s.getSubmittedAt(),
                 s.getGradedAt(),
-                s.getHomeworkNumber()
+                s.getHomeworkNumber(),
+                s.getSupplementaryFileName()
         );
     }
 

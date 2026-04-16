@@ -63,17 +63,30 @@ public class StudentHomeworkPortalController {
         return service.listMySubmissions(userId);
     }
 
-    /** Власне вкладення здачі: лише автор учень. */
+    /** Власне вкладення здачі: лише автор учень. {@code part=supplementary|extra} — другий файл. */
     @GetMapping("/submissions/{submissionId}/file")
     public ResponseEntity<Resource> studentOwnFile(
             @RequestParam("userId") @NotBlank String userId,
             @PathVariable("submissionId") String submissionId,
-            @RequestParam(value = "inline", defaultValue = "false") boolean inline
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline,
+            @RequestParam(value = "part", defaultValue = "primary") String part
     ) {
+        boolean supplementary = "supplementary".equalsIgnoreCase(part) || "extra".equalsIgnoreCase(part);
         return HomeworkFileHttpResponses.toResponse(
-                service.getStudentOwnFileDownload(userId, submissionId),
+                service.getStudentOwnFileDownload(userId, submissionId, supplementary),
                 inline
         );
+    }
+
+    /** Додати примітку та/або другий файл до здачі зі статусом submitted. */
+    @PostMapping(value = "/submissions/{submissionId}/supplement", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public HomeworkSubmissionResponse supplement(
+            @RequestParam("userId") @NotBlank String userId,
+            @PathVariable("submissionId") String submissionId,
+            @RequestParam(value = "extraMessage", required = false) String extraMessage,
+            @RequestParam(value = "file", required = false) MultipartFile file
+    ) {
+        return service.supplement(userId, submissionId, extraMessage, file);
     }
 
     /** Зірки з оцінених ДЗ для таблиць і графіка на дашборді учня. */

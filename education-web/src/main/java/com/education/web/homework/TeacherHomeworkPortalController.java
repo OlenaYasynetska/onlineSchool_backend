@@ -52,8 +52,10 @@ public class TeacherHomeworkPortalController {
     public ResponseEntity<Resource> download(
             @RequestParam("userId") String userId,
             @PathVariable("submissionId") String submissionId,
-            @RequestParam(value = "inline", defaultValue = "false") boolean inline
+            @RequestParam(value = "inline", defaultValue = "false") boolean inline,
+            @RequestParam(value = "part", defaultValue = "primary") String part
     ) {
-        return HomeworkFileHttpResponses.toResponse(service.getFileDownload(userId, submissionId), inline);
+        boolean supplementary = "supplementary".equalsIgnoreCase(part) || "extra".equalsIgnoreCase(part);
+        return HomeworkFileHttpResponses.toResponse(service.getFileDownload(userId, submissionId, supplementary), inline);
     }
 }

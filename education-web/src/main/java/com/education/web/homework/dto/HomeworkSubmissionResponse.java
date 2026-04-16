@@ -15,6 +15,7 @@ public record HomeworkSubmissionResponse(
         String groupName,
         Instant submittedAt,
         Instant gradedAt,
-        String homeworkNumber
+        String homeworkNumber,
+        String supplementaryFileName
 ) {
 }

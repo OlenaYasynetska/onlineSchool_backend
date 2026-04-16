@@ -48,6 +48,18 @@ public class HomeworkPortalSubmissionEntity {
     @Column(name = "file_size_bytes")
     private Long fileSizeBytes;
 
+    @Column(name = "supplementary_file_name")
+    private String supplementaryFileName;
+
+    @Column(name = "supplementary_storage_path", length = 1024)
+    private String supplementaryStoragePath;
+
+    @Column(name = "supplementary_content_type", length = 128)
+    private String supplementaryContentType;
+
+    @Column(name = "supplementary_file_size_bytes")
+    private Long supplementaryFileSizeBytes;
+
     @Column(name = "status", nullable = false, length = 32)
     private String status = "submitted";
 
@@ -176,6 +188,38 @@ public class HomeworkPortalSubmissionEntity {
 
     public void setFileSizeBytes(Long fileSizeBytes) {
         this.fileSizeBytes = fileSizeBytes;
+    }
+
+    public String getSupplementaryFileName() {
+        return supplementaryFileName;
+    }
+
+    public void setSupplementaryFileName(String supplementaryFileName) {
+        this.supplementaryFileName = supplementaryFileName;
+    }
+
+    public String getSupplementaryStoragePath() {
+        return supplementaryStoragePath;
+    }
+
+    public void setSupplementaryStoragePath(String supplementaryStoragePath) {
+        this.supplementaryStoragePath = supplementaryStoragePath;
+    }
+
+    public String getSupplementaryContentType() {
+        return supplementaryContentType;
+    }
+
+    public void setSupplementaryContentType(String supplementaryContentType) {
+        this.supplementaryContentType = supplementaryContentType;
+    }
+
+    public Long getSupplementaryFileSizeBytes() {
+        return supplementaryFileSizeBytes;
+    }
+
+    public void setSupplementaryFileSizeBytes(Long supplementaryFileSizeBytes) {
+        this.supplementaryFileSizeBytes = supplementaryFileSizeBytes;
     }
 
     public String getStatus() {
