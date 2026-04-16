@@ -33,6 +33,9 @@ public class HomeworkPortalSubmissionEntity {
     @Column(name = "message_text", columnDefinition = "TEXT")
     private String messageText;
 
+    @Column(name = "homework_number", length = 128)
+    private String homeworkNumber;
+
     @Column(name = "file_name", nullable = false)
     private String fileName;
 
@@ -133,6 +136,14 @@ public class HomeworkPortalSubmissionEntity {
 
     public void setMessageText(String messageText) {
         this.messageText = messageText;
+    }
+
+    public String getHomeworkNumber() {
+        return homeworkNumber;
+    }
+
+    public void setHomeworkNumber(String homeworkNumber) {
+        this.homeworkNumber = homeworkNumber;
     }
 
     public String getFileName() {

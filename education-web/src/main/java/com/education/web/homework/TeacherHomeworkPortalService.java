@@ -146,7 +146,8 @@ public class TeacherHomeworkPortalService {
                 s.getTeacherFeedback(),
                 groupName,
                 s.getSubmittedAt(),
-                s.getGradedAt()
+                s.getGradedAt(),
+                s.getHomeworkNumber()
         );
     }
 

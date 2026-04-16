@@ -95,8 +95,9 @@ public class StudentHomeworkPortalController {
             @RequestParam(value = "groupId", required = false) String groupId,
             @RequestParam("subjectTitle") @NotBlank String subjectTitle,
             @RequestParam(value = "messageText", required = false) String messageText,
+            @RequestParam(value = "homeworkNumber", required = false) String homeworkNumber,
             @RequestParam(value = "file", required = false) MultipartFile file
     ) {
-        return service.submit(userId, teacherId, groupId, subjectTitle, messageText, file);
+        return service.submit(userId, teacherId, groupId, subjectTitle, messageText, homeworkNumber, file);
     }
 }

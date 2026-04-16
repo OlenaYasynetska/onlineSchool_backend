@@ -409,6 +409,7 @@ public class StudentHomeworkPortalService {
             String groupId,
             String subjectTitle,
             String messageText,
+            String homeworkNumber,
             MultipartFile file
     ) {
         boolean hasFile = file != null && !file.isEmpty() && !isNoAttachmentPlaceholder(file);
@@ -481,6 +482,11 @@ public class StudentHomeworkPortalService {
         row.setGroupId(groupIdToStore);
         row.setSubjectTitle(subj);
         row.setMessageText(messageText != null ? messageText.trim() : null);
+        String hwNum = homeworkNumber != null ? homeworkNumber.trim() : "";
+        if (hwNum.length() > 128) {
+            hwNum = hwNum.substring(0, 128);
+        }
+        row.setHomeworkNumber(hwNum.isEmpty() ? null : hwNum);
         row.setFileName(orig);
         row.setStoragePath(relativePath);
         if (hasFile) {
@@ -557,7 +563,8 @@ public class StudentHomeworkPortalService {
                 s.getTeacherFeedback(),
                 groupName,
                 s.getSubmittedAt(),
-                s.getGradedAt()
+                s.getGradedAt(),
+                s.getHomeworkNumber()
         );
     }
 

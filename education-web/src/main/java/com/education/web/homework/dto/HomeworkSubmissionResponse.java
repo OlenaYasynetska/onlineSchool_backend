@@ -14,6 +14,7 @@ public record HomeworkSubmissionResponse(
         String teacherFeedback,
         String groupName,
         Instant submittedAt,
-        Instant gradedAt
+        Instant gradedAt,
+        String homeworkNumber
 ) {
 }
