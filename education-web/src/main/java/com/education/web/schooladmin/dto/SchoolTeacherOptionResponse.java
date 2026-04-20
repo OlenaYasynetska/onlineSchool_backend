@@ -11,6 +11,8 @@ public record SchoolTeacherOptionResponse(
         String email,
         String phone,
         List<String> subjectTitles,
+        /** {@code school_subjects.id} for each assigned subject (same order as titles when resolved). */
+        List<String> subjectIds,
         List<String> groupNames,
         boolean inviteEmailSent
 ) {
@@ -20,8 +22,9 @@ public record SchoolTeacherOptionResponse(
             String email,
             String phone,
             List<String> subjectTitles,
+            List<String> subjectIds,
             List<String> groupNames
     ) {
-        this(id, displayName, email, phone, subjectTitles, groupNames, false);
+        this(id, displayName, email, phone, subjectTitles, subjectIds, groupNames, false);
     }
 }

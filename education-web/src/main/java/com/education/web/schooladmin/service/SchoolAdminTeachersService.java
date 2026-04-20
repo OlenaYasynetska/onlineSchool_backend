@@ -172,8 +172,16 @@ public class SchoolAdminTeachersService {
     private SchoolTeacherOptionResponse toOption(TeacherEntity t, boolean inviteEmailSent) {
         UserEntity u = t.getUser();
         String display = (u.getFirstName() + " " + u.getLastName()).trim();
-        List<String> subjects = teacherSubjects.findByTeacher_IdOrderBySortOrderAsc(t.getId()).stream()
+        String orgId = t.getSchool().getId();
+        List<TeacherSubjectEntity> subjectLines = teacherSubjects.findByTeacher_IdOrderBySortOrderAsc(t.getId());
+        List<String> subjects = subjectLines.stream()
                 .map(TeacherSubjectEntity::getTitle)
+                .toList();
+        List<String> subjectIds = subjectLines.stream()
+                .map(TeacherSubjectEntity::getTitle)
+                .flatMap(title -> schoolSubjects.findByOrganization_IdAndTitleIgnoreCase(orgId, title).stream())
+                .map(SchoolSubjectEntity::getId)
+                .distinct()
                 .toList();
         List<String> groups = schoolGroups.findByTeacher_IdOrderByNameAsc(t.getId()).stream()
                 .map(SchoolGroupEntity::getName)
@@ -191,6 +199,7 @@ public class SchoolAdminTeachersService {
                 u.getEmail(),
                 phone,
                 subjects,
+                subjectIds,
                 groups,
                 inviteEmailSent
         );
