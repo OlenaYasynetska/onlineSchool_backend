@@ -54,4 +54,4 @@ app:
   # Якщо SUPER_ADMIN_PASSWORD порожній — запис не створюється і не оновлюється.
   super-admin:
     email: ${SUPER_ADMIN_EMAIL:superadmin@education.local}
-    bootstrap-password: ${SUPER_ADMIN_PASSWORD:123456789}
+    bootstrap-password: ${SUPER_ADMIN_PASSWORD:SuperAdmin!ChangeMe}
