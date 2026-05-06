@@ -1,8 +1,10 @@
 package com.education.web.schooladmin;
 
+import com.education.web.schooladmin.dto.AttachExistingTeacherRequest;
 import com.education.web.schooladmin.dto.CreateSchoolTeacherRequest;
 import com.education.web.schooladmin.dto.SchoolTeacherOptionResponse;
 import com.education.web.schooladmin.service.SchoolAdminTeachersService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,5 +35,14 @@ public class SchoolAdminTeachersController {
             @RequestBody CreateSchoolTeacherRequest request
     ) {
         return teachersService.createTeacher(schoolId, request);
+    }
+
+    /** Прив’язати існуючий акаунт (роль TEACHER) до школи як викладач. */
+    @PostMapping("/teachers/attach-existing")
+    public SchoolTeacherOptionResponse attachExistingTeacher(
+            @RequestParam("schoolId") String schoolId,
+            @Valid @RequestBody AttachExistingTeacherRequest body
+    ) {
+        return teachersService.attachExistingUser(schoolId, body);
     }
 }

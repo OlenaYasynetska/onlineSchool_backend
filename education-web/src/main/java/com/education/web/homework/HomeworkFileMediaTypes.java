@@ -26,6 +26,18 @@ public final class HomeworkFileMediaTypes {
         } catch (Exception ignored) {
             // fall through
         }
+        return resolveFromFileMeta(null, fileName);
+    }
+
+    /** Без файлу на диску (PDF у БД): тип з БД або за розширенням імені. */
+    public static MediaType resolveFromFileMeta(String storedContentType, String fileName) {
+        if (storedContentType != null && !storedContentType.isBlank()) {
+            try {
+                return MediaType.parseMediaType(storedContentType);
+            } catch (Exception ignored) {
+                // fall through
+            }
+        }
         if (fileName != null) {
             String lower = fileName.toLowerCase();
             if (lower.endsWith(".pdf")) {

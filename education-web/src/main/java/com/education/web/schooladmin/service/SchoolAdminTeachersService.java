@@ -14,6 +14,7 @@ import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.auth.repository.TeacherSubjectJpaRepository;
 import com.education.web.auth.repository.UserJpaRepository;
 import com.education.web.mail.AccountInvitationMailService;
+import com.education.web.schooladmin.dto.AttachExistingTeacherRequest;
 import com.education.web.schooladmin.dto.CreateSchoolTeacherRequest;
 import com.education.web.schooladmin.dto.SchoolTeacherOptionResponse;
 import com.education.web.util.SecurePasswordGenerator;
@@ -156,6 +157,63 @@ public class SchoolAdminTeachersService {
         }
 
         return toOption(row, inviteSent);
+    }
+
+    /**
+     * Профіль викладача для вже існуючого користувача з роллю TEACHER (рядок у {@code teachers} відсутній).
+     * Типова причина — акаунт створено вручну в БД без зв’язку зі школою.
+     */
+    @Transactional
+    public SchoolTeacherOptionResponse attachExistingUser(String schoolId, AttachExistingTeacherRequest req) {
+        OrganizationEntity org = organizations.findById(schoolId).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "School not found")
+        );
+
+        String email = req.email() != null ? req.email().trim().toLowerCase() : "";
+        if (email.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Missing email");
+        }
+        UserEntity user = users.findByEmailIgnoreCase(email).orElseThrow(
+                () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No user with this email")
+        );
+        if (user.getRole() != UserRole.TEACHER) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User must have teacher role");
+        }
+        if (teachers.findByUser_Id(user.getId()).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This account already has a teacher profile");
+        }
+
+        TeacherEntity row = new TeacherEntity();
+        row.setUser(user);
+        row.setSchool(org);
+        row = teachers.saveAndFlush(row);
+
+        List<String> titles = req.subjects() != null ? req.subjects() : List.of();
+        int order = 0;
+        for (String raw : titles) {
+            if (raw == null) {
+                continue;
+            }
+            String title = raw.trim();
+            if (title.isEmpty()) {
+                continue;
+            }
+            if (title.length() > MAX_SUBJECT_TITLE_LEN) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Each subject must be at most " + MAX_SUBJECT_TITLE_LEN + " characters"
+                );
+            }
+            SchoolSubjectEntity catalog = ensureSchoolSubject(org, title);
+            TeacherSubjectEntity line = new TeacherSubjectEntity();
+            line.setTeacher(row);
+            line.setTitle(catalog.getTitle());
+            line.setSortOrder(order++);
+            teacherSubjects.save(line);
+        }
+        teacherSubjects.flush();
+
+        return toOption(row, false);
     }
 
     /** Додає рядок у `school_subjects`, якщо такої назви ще немає (без урахування регістру). */
