@@ -8,6 +8,8 @@ import com.education.web.materials.dto.CreateStudyMaterialSetRequest;
 import com.education.web.materials.dto.StudyMaterialLessonResponse;
 import com.education.web.materials.dto.StudyMaterialSetResponse;
 import com.education.web.materials.dto.TeacherSubjectOptionResponse;
+import com.education.web.materials.dto.UpdateStudyMaterialLessonRequest;
+import com.education.web.materials.dto.UpdateStudyMaterialSetRequest;
 import com.education.web.materials.model.StudyMaterialLessonEntity;
 import com.education.web.materials.model.StudyMaterialSetEntity;
 import com.education.web.materials.repository.StudyMaterialLessonJpaRepository;
@@ -153,6 +155,67 @@ public class TeacherStudyMaterialService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your lesson");
         }
         return le;
+    }
+
+    @Transactional
+    public StudyMaterialSetResponse updateSet(String userId, String setId, UpdateStudyMaterialSetRequest body) {
+        TeacherEntity t = requireTeacher(userId);
+        StudyMaterialSetEntity set = sets.findById(setId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material set not found"));
+        if (!set.getTeacher().getId().equals(t.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your material set");
+        }
+        set.setTitle(body.title().trim());
+        String desc = body.description();
+        set.setDescription(desc == null || desc.isBlank() ? null : desc.trim());
+        set.setUpdatedAt(Instant.now());
+        return toSetResponse(sets.save(set));
+    }
+
+    @Transactional
+    public StudyMaterialLessonResponse updateLesson(
+            String userId,
+            String lessonId,
+            UpdateStudyMaterialLessonRequest body
+    ) {
+        TeacherEntity t = requireTeacher(userId);
+        StudyMaterialLessonEntity le = lessons.findById(lessonId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
+        if (!le.getMaterialSet().getTeacher().getId().equals(t.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your lesson");
+        }
+        le.setTitle(body.title().trim());
+        le.setUpdatedAt(Instant.now());
+        StudyMaterialSetEntity matSet = le.getMaterialSet();
+        matSet.setUpdatedAt(Instant.now());
+        sets.save(matSet);
+        lessons.save(le);
+        return new StudyMaterialLessonResponse(le.getId(), le.getTitle(), le.getSortOrder(), le.getFileName());
+    }
+
+    @Transactional
+    public void deleteSet(String userId, String setId) {
+        TeacherEntity t = requireTeacher(userId);
+        StudyMaterialSetEntity set = sets.findById(setId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material set not found"));
+        if (!set.getTeacher().getId().equals(t.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your material set");
+        }
+        sets.delete(set);
+    }
+
+    @Transactional
+    public void deleteLesson(String userId, String lessonId) {
+        TeacherEntity t = requireTeacher(userId);
+        StudyMaterialLessonEntity le = lessons.findById(lessonId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lesson not found"));
+        if (!le.getMaterialSet().getTeacher().getId().equals(t.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your lesson");
+        }
+        StudyMaterialSetEntity set = le.getMaterialSet();
+        lessons.delete(le);
+        set.setUpdatedAt(Instant.now());
+        sets.save(set);
     }
 
     private StudyMaterialSetResponse toSetResponse(StudyMaterialSetEntity e) {
