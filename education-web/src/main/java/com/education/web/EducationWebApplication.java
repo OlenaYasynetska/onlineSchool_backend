@@ -18,11 +18,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @EntityScan(basePackages = {
         "com.education.web.auth.model",
         "com.education.web.homework",
+        "com.education.web.materials.model",
         "com.education.infrastructure.student"
 })
 @EnableJpaRepositories(basePackages = {
         "com.education.web.auth.repository",
         "com.education.web.homework",
+        "com.education.web.materials.repository",
         "com.education.infrastructure.student"
 })
 public class EducationWebApplication {
