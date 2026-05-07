@@ -62,7 +62,13 @@ public class SchoolAdminStudyMaterialService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material set not found"));
         assertSetInSchool(schoolId, set);
         return lessons.findByMaterialSet_IdOrderBySortOrderAsc(setId).stream()
-                .map(l -> new StudyMaterialLessonResponse(l.getId(), l.getTitle(), l.getSortOrder(), l.getFileName()))
+                .map(l -> new StudyMaterialLessonResponse(
+                        l.getId(),
+                        l.getTitle(),
+                        l.getSortOrder(),
+                        l.getFileName(),
+                        l.getIssuuEmbedUrl()
+                ))
                 .toList();
     }
 

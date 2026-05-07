@@ -4,5 +4,6 @@ public record StudyMaterialLessonResponse(
         String id,
         String title,
         int sortOrder,
-        String fileName
+        String fileName,
+        String issuuEmbedUrl
 ) {}

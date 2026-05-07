@@ -96,7 +96,13 @@ public class TeacherStudyMaterialService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your material set");
         }
         return lessons.findByMaterialSet_IdOrderBySortOrderAsc(setId).stream()
-                .map(l -> new StudyMaterialLessonResponse(l.getId(), l.getTitle(), l.getSortOrder(), l.getFileName()))
+                .map(l -> new StudyMaterialLessonResponse(
+                        l.getId(),
+                        l.getTitle(),
+                        l.getSortOrder(),
+                        l.getFileName(),
+                        l.getIssuuEmbedUrl()
+                ))
                 .toList();
     }
 
@@ -143,7 +149,13 @@ public class TeacherStudyMaterialService {
         set.setUpdatedAt(Instant.now());
         sets.save(set);
 
-        return new StudyMaterialLessonResponse(le.getId(), le.getTitle(), le.getSortOrder(), le.getFileName());
+        return new StudyMaterialLessonResponse(
+                le.getId(),
+                le.getTitle(),
+                le.getSortOrder(),
+                le.getFileName(),
+                le.getIssuuEmbedUrl()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -165,8 +177,8 @@ public class TeacherStudyMaterialService {
         if (!set.getTeacher().getId().equals(t.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your material set");
         }
-        set.setTitle(body.title().trim());
-        String desc = body.description();
+        set.setTitle(body.getTitle().trim());
+        String desc = body.getDescription();
         set.setDescription(desc == null || desc.isBlank() ? null : desc.trim());
         set.setUpdatedAt(Instant.now());
         return toSetResponse(sets.save(set));
@@ -184,13 +196,24 @@ public class TeacherStudyMaterialService {
         if (!le.getMaterialSet().getTeacher().getId().equals(t.getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not your lesson");
         }
-        le.setTitle(body.title().trim());
+        le.setTitle(body.getTitle().trim());
+        try {
+            le.setIssuuEmbedUrl(IssuuEmbedUrlValidator.normalizeOrThrow(body.getIssuuEmbedUrl()));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
         le.setUpdatedAt(Instant.now());
         StudyMaterialSetEntity matSet = le.getMaterialSet();
         matSet.setUpdatedAt(Instant.now());
         sets.save(matSet);
         lessons.save(le);
-        return new StudyMaterialLessonResponse(le.getId(), le.getTitle(), le.getSortOrder(), le.getFileName());
+        return new StudyMaterialLessonResponse(
+                le.getId(),
+                le.getTitle(),
+                le.getSortOrder(),
+                le.getFileName(),
+                le.getIssuuEmbedUrl()
+        );
     }
 
     @Transactional
