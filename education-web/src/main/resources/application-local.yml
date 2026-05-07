@@ -18,6 +18,9 @@
 spring:
   flyway:
     repair-on-migrate: true
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://127.0.0.1:27017/school_chat}
   mail:
     host: ${MAIL_HOST:}
     port: ${MAIL_PORT:587}

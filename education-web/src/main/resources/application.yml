@@ -1,8 +1,9 @@
 spring:
   data:
     mongodb:
-      # Railway / prod: задайте MONGODB_URI (Atlas mongodb+srv://…). Без змінної для деплою лишається localhost — на Railway Mongo немає → процес падає при старті.
-      uri: ${MONGODB_URI:mongodb://127.0.0.1:27017/school_chat}
+      # Обов'язково в prod (Railway тощо): змінна середовища MONGODB_URI = Atlas mongodb+srv://…/school_chat?…
+      # Локально без Atlas: Active profiles: local (див. application-local.yml) або задайте MONGODB_URI вручну.
+      uri: ${MONGODB_URI}
       # Atlas часто дає URI без імені БД у шляху; для Spring Boot 3 потрібне ім’я (див. issue "Database name must not be empty").
       database: school_chat
       auto-index-creation: true
