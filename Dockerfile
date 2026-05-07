@@ -1,6 +1,7 @@
-# Збірка з кореня репозиторію: onlineSchool_backend (Render: Root Directory = )
-# fix deploy
-FROM eclipse-temurin:21-jdk-alpine AS build
+# Збірка з кореня репозиторію: onlineSchool_backend.
+# На Railway: Root Directory = корінь цього репо (тут лежить pom.xml і education-*/).
+# Використовуємо офіційний Maven + JDK 21 — apk maven на Alpine часто ламає збірку.
+FROM maven:3.9-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 
 COPY pom.xml .
@@ -9,7 +10,7 @@ COPY education-application/pom.xml education-application/
 COPY education-infrastructure/pom.xml education-infrastructure/
 COPY education-web/pom.xml education-web/
 
-RUN apk add --no-cache maven && mvn dependency:go-offline -B -pl education-web -am
+RUN mvn dependency:go-offline -B -pl education-web -am
 
 COPY education-domain/src education-domain/src
 COPY education-application/src education-application/src

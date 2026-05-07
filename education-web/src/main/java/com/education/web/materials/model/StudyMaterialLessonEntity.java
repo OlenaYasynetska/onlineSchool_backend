@@ -45,9 +45,13 @@ public class StudyMaterialLessonEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt;
+
     @Column(name = "issuu_embed_url", length = 2048)
     private String issuuEmbedUrl;
 
+    @PrePersist
     void onCreate() {
         if (this.id == null || this.id.isBlank()) {
             this.id = UUID.randomUUID().toString();
