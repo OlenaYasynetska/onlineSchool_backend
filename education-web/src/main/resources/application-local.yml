@@ -1,4 +1,6 @@
-# Локально ввімкнути чат на Mongo: CHAT_MONGO_ENABLED=true та MONGODB_URI (або локальний mongodb://127.0.0.1:27017/school_chat).
+# Чат на Mongo локально: у Run Configuration додайте профілі local,mongo та задайте MONGODB_URI (або лишіть дефолт localhost з application.yml).
+# Railway / prod без чату: не додавайте профіль mongo і не задавайте SPRING_PROFILES_ACTIVE=mongo.
+#
 # Локальная разработка: один раз включи профиль "local", если меняли уже применённые Flyway-скрипты (V1/V2/V3)
 # и видишь "Migration checksum mismatch" / "failed validation".
 # IntelliJ: Run → Edit Configurations → EducationWebApplication → Active profiles: local

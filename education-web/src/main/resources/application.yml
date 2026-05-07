@@ -1,7 +1,8 @@
+# Спільні налаштування (завжди завантажуються).
 education:
   chat:
-    # Увімкнути Mongo (Atlas) і API /api/chat/: CHAT_MONGO_ENABLED=true та MONGODB_URI. За замовчуванням — без Mongo.
-    mongodb-enabled: ${CHAT_MONGO_ENABLED:false}
+    # Під час профілю "mongo" нижче буде true. Без "mongo" — чат на Mongo вимкнено (Railway без Atlas).
+    mongodb-enabled: false
 
 spring:
   data:
@@ -23,9 +24,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    # Repair перед migrate робить FlywayMigrationStrategy у FlywayRepairBeforeMigrateConfig (надійніше за лише YAML).
     repair-on-migrate: false
-    # Если правили V1/V2/V3 после применения к БД: один раз запусти с профилем "local" (см. application-local.yml).
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -35,7 +34,6 @@ spring:
       max-request-size: 28MB
 
 server:
-  # Railway/Render/Heroku: PORT з оточення; локально — 8080
   port: ${PORT:8080}
 
 jwt:
@@ -48,20 +46,36 @@ logging:
     root: INFO
     com.education.web: DEBUG
 
-# Посилання у листі-запрошенні (сторінка логіну фронтенду).
 app:
-  # CORS: прод — CORS_ALLOWED_ORIGINS=https://your-app.vercel.app (через кому). Dev: merge localhost + credentials.
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
     merge-localhost: ${CORS_MERGE_LOCALHOST:true}
   frontend:
     base-url: ${FRONTEND_BASE_URL:http://localhost:4200}
-  # У Docker/Railway без volume користувач app часто не може створити /app/uploads — тоді задайте HOMEWORK_UPLOAD_DIR
-  # або залиште дефолт: tmpdir JVM (завжди доступний для запису).
   homework-upload:
     dir: ${HOMEWORK_UPLOAD_DIR:${java.io.tmpdir}/education-homework}
-  # Суперадмін для POST /api/auth/login (пароль лише на сервері, напр. Railway → SUPER_ADMIN_PASSWORD).
-  # Якщо SUPER_ADMIN_PASSWORD порожній — запис не створюється і не оновлюється.
   super-admin:
     email: ${SUPER_ADMIN_EMAIL:superadmin@education.local}
     bootstrap-password: ${SUPER_ADMIN_PASSWORD:123456}
+
+---
+# Профіль "mongo" НЕ активний: повністю вимикаємо Mongo auto-config (надійніше за EnvironmentPostProcessor у проді).
+spring:
+  config:
+    activate:
+      on-profile: "!mongo"
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.mongo.MongoAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoDataAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.mongo.MongoRepositoriesAutoConfiguration
+
+---
+# Увімкнути чат на Atlas/Mongo: SPRING_PROFILES_ACTIVE=mongo (+ змінна MONGODB_URI на проді).
+spring:
+  config:
+    activate:
+      on-profile: "mongo"
+education:
+  chat:
+    mongodb-enabled: true
