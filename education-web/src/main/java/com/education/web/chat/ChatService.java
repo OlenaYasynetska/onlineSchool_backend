@@ -14,6 +14,7 @@ import com.education.web.chat.dto.ChatMessageResponse;
 import com.education.web.chat.dto.OpenConversationResponse;
 import com.education.web.chat.repository.ChatConversationRepository;
 import com.education.web.chat.repository.ChatMessageRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.util.UUID;
 
 @Service
 @org.springframework.transaction.annotation.Transactional(readOnly = true)
+@ConditionalOnProperty(name = "education.chat.mongodb-enabled", havingValue = "true")
 public class ChatService {
 
     private static final int PREVIEW_MAX = 240;

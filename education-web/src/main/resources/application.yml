@@ -1,10 +1,12 @@
+education:
+  chat:
+    # Увімкнути Mongo (Atlas) і API /api/chat/: CHAT_MONGO_ENABLED=true та MONGODB_URI. За замовчуванням — без Mongo.
+    mongodb-enabled: ${CHAT_MONGO_ENABLED:false}
+
 spring:
   data:
     mongodb:
-      # Обов'язково в prod (Railway тощо): змінна середовища MONGODB_URI = Atlas mongodb+srv://…/school_chat?…
-      # Локально без Atlas: Active profiles: local (див. application-local.yml) або задайте MONGODB_URI вручну.
-      uri: ${MONGODB_URI}
-      # Atlas часто дає URI без імені БД у шляху; для Spring Boot 3 потрібне ім’я (див. issue "Database name must not be empty").
+      uri: ${MONGODB_URI:mongodb://127.0.0.1:27017/school_chat}
       database: school_chat
       auto-index-creation: true
   datasource:

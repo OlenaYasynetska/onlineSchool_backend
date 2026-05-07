@@ -4,6 +4,7 @@ import com.education.web.auth.model.SchoolGroupEntity;
 import com.education.web.auth.model.TeacherEntity;
 import com.education.web.auth.repository.SchoolGroupJpaRepository;
 import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
  * де цей вчитель призначений ({@code school_groups.teacher_id}).
  */
 @Service
+@ConditionalOnProperty(name = "education.chat.mongodb-enabled", havingValue = "true")
 public class ChatTeacherStudentLinkService {
 
     private final SchoolGroupJpaRepository schoolGroups;

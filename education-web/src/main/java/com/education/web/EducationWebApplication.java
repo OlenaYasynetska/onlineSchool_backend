@@ -5,7 +5,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 
 @SpringBootApplication(
         scanBasePackages = "com.education",
@@ -28,7 +27,6 @@ import org.springframework.data.mongodb.repository.config.EnableMongoRepositorie
         "com.education.web.materials.repository",
         "com.education.infrastructure.student"
 })
-@EnableMongoRepositories(basePackages = "com.education.web.chat.repository")
 public class EducationWebApplication {
 
     public static void main(String[] args) {

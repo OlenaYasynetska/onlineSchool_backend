@@ -7,6 +7,7 @@ import com.education.web.auth.model.UserEntity;
 import com.education.web.auth.model.UserRole;
 import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.auth.repository.UserJpaRepository;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -15,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
  * Перевірка ролі та зв’язку «вчитель призначений на групу учня» (MySQL).
  */
 @Service
+@ConditionalOnProperty(name = "education.chat.mongodb-enabled", havingValue = "true")
 public class ChatEligibilityService {
 
     private final UserJpaRepository users;
