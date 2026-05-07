@@ -24,7 +24,8 @@ WORKDIR /app
 
 RUN addgroup -S app && adduser -S app -G app
 
-COPY --from=build /app/education-web/target/*.jar app.jar
+# Один fat-jar (finalName=app). Не використовувати *.jar — також є original-app.jar → COPY з кількома джерелами ламає збірку образу.
+COPY --from=build /app/education-web/target/app.jar app.jar
 
 # HomeworkUploadDirectoryInitializer створює app.homework-upload.dir (за замовч. uploads/homework → /app/uploads/…).
 # Без chown користувач app не має права писати в /app → AccessDeniedException при старті.
