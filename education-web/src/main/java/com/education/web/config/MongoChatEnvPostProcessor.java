@@ -27,8 +27,7 @@ public class MongoChatEnvPostProcessor implements EnvironmentPostProcessor {
 
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
-        boolean enabled = environment.getProperty(ENABLED_KEY, Boolean.class, Boolean.FALSE);
-        if (Boolean.TRUE.equals(enabled)) {
+        if (isMongoChatEnabled(environment)) {
             return;
         }
 
@@ -49,5 +48,16 @@ public class MongoChatEnvPostProcessor implements EnvironmentPostProcessor {
         Map<String, Object> map = new HashMap<>();
         map.put("spring.autoconfigure.exclude", String.join(",", excludes));
         environment.getPropertySources().addFirst(new MapPropertySource("mongoChatDisabled", map));
+    }
+
+    /**
+     * Лише явний {@code true} вмикає Mongo; порожнє / false / інше — вимкнено (без localhost на Railway).
+     */
+    private static boolean isMongoChatEnabled(ConfigurableEnvironment environment) {
+        String raw = environment.getProperty(ENABLED_KEY);
+        if (raw == null || raw.isBlank()) {
+            return false;
+        }
+        return Boolean.parseBoolean(raw.trim());
     }
 }
