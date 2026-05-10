@@ -119,7 +119,7 @@ public class StudentHomeworkPortalService {
                 .map(SchoolGroupStudentEntity::getGroup)
                 .map(g -> new StudentGroupOptionResponse(g.getId(), g.getName(), g.getCode()))
                 .collect(Collectors.toList());
-        return new StudentDashboardContextResponse(schoolName, groups);
+        return new StudentDashboardContextResponse(schoolName, groups, st.getId());
     }
 
     public List<TeacherOptionShortResponse> listTeachersForStudent(String userId) {

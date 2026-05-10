@@ -17,6 +17,8 @@ import com.education.web.chat.repository.ChatMessageRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -31,6 +33,7 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "education.chat.mongodb-enabled", havingValue = "true")
 public class ChatService {
 
+    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
     private static final int PREVIEW_MAX = 240;
 
     private final ChatConversationRepository conversations;
@@ -104,17 +107,30 @@ public class ChatService {
         }
 
         List<ChatConversationDocument> rows = new ArrayList<>(conversations.findByParticipantUserId(userId));
-        rows.sort(Comparator.comparing(ChatConversationDocument::getLastMessageAt).reversed());
+        rows.sort(Comparator.comparing(
+                        ChatConversationDocument::getLastMessageAt,
+                        Comparator.nullsFirst(Comparator.naturalOrder()))
+                .reversed());
 
         List<ChatConversationSummaryResponse> out = new ArrayList<>(rows.size());
         for (ChatConversationDocument c : rows) {
-            out.add(toSummary(userId, c));
+            try {
+                out.add(toSummary(userId, c));
+            } catch (RuntimeException ex) {
+                log.warn("Skip conversation summary for id={}: {}", c.getId(), ex.getMessage());
+            }
         }
         return out;
     }
 
     private ChatConversationSummaryResponse toSummary(String currentUserId, ChatConversationDocument c) {
         if (Boolean.TRUE.equals(c.getStudentPeerChat())) {
+            if (c.getStudentPeerLowUserId() == null
+                    || c.getStudentPeerHighUserId() == null
+                    || c.getStudentPeerLowRecordId() == null
+                    || c.getStudentPeerHighRecordId() == null) {
+                throw new IllegalStateException("Incomplete student-peer conversation document");
+            }
             boolean iAmLow = currentUserId.equals(c.getStudentPeerLowUserId());
             String peerEntityId = iAmLow ? c.getStudentPeerHighRecordId() : c.getStudentPeerLowRecordId();
             String peerName = students.findById(peerEntityId).map(StudentJpaEntity::getFullName).orElse("Unknown");
@@ -127,6 +143,13 @@ public class ChatService {
                     c.getLastMessagePreview() != null ? c.getLastMessagePreview() : "",
                     c.getLastMessageAt(),
                     unread);
+        }
+
+        if (c.getTeacherRecordId() == null
+                || c.getStudentRecordId() == null
+                || c.getTeacherUserId() == null
+                || c.getStudentUserId() == null) {
+            throw new IllegalStateException("Incomplete teacher-student conversation document");
         }
 
         boolean iAmTeacher = currentUserId.equals(c.getTeacherUserId());
