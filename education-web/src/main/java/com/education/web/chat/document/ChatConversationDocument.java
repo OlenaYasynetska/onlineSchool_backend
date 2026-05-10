@@ -16,7 +16,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "chat_conversations")
-@CompoundIndex(name = "ux_teacher_student", def = "{'teacherRecordId': 1, 'studentRecordId': 1}", unique = true)
+@CompoundIndex(name = "ix_teacher_student", def = "{'teacherRecordId': 1, 'studentRecordId': 1}")
 public class ChatConversationDocument {
 
     @Id
@@ -39,4 +39,22 @@ public class ChatConversationDocument {
     private String lastMessagePreview;
 
     private Instant createdAt;
+
+    /** Останній раз «нижній» учень (studentPeerLow) переглядав діалог; для TS — учитель. */
+    private Instant teacherLastReadAt;
+
+    /** Останній раз «верхній» учень (studentPeerHigh) переглядав діалог; для TS — учень. */
+    private Instant studentLastReadAt;
+
+    /** Діалог між двома учнями (інакше учитель–учень). */
+    private Boolean studentPeerChat;
+
+    /** Упорядкована пара {@code students.id}: low.compareTo(high) <= 0. */
+    private String studentPeerLowRecordId;
+
+    private String studentPeerHighRecordId;
+
+    private String studentPeerLowUserId;
+
+    private String studentPeerHighUserId;
 }

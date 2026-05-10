@@ -15,6 +15,7 @@ import com.education.web.auth.repository.TeacherSubjectJpaRepository;
 import com.education.web.homework.dto.HomeworkFileDownload;
 import com.education.web.homework.dto.HomeworkSubmissionResponse;
 import com.education.web.homework.dto.StarRewardLogRow;
+import com.education.web.homework.dto.StudentClassmateOptionResponse;
 import com.education.web.homework.dto.StudentDashboardContextResponse;
 import com.education.web.homework.dto.StudentGroupOptionResponse;
 import com.education.web.homework.dto.StudentMyStarsResponse;
@@ -42,9 +43,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -128,6 +131,40 @@ public class StudentHomeworkPortalService {
                     return new TeacherOptionShortResponse(t.getId(), dn);
                 })
                 .collect(Collectors.toList());
+    }
+
+    /** Інші учні з тих самих груп (з обліковим записом), без себе. */
+    @Transactional(readOnly = true)
+    public List<StudentClassmateOptionResponse> listClassmatesForStudent(String userId) {
+        StudentJpaEntity me = requireStudentByUser(userId);
+        List<SchoolGroupStudentEntity> myLinks = groupStudents.findByStudentIdFetchGroup(me.getId());
+        if (myLinks.isEmpty()) {
+            return List.of();
+        }
+        Set<String> peerIds = new LinkedHashSet<>();
+        for (SchoolGroupStudentEntity link : myLinks) {
+            String gid = link.getGroup().getId();
+            for (SchoolGroupStudentEntity row : groupStudents.findByGroup_IdOrderByStudentIdAsc(gid)) {
+                String sid = row.getStudentId();
+                if (sid != null && !sid.equals(me.getId())) {
+                    peerIds.add(sid);
+                }
+            }
+        }
+        List<StudentClassmateOptionResponse> out = new ArrayList<>();
+        for (String peerId : peerIds) {
+            students.findById(peerId).ifPresent(s -> {
+                if (s.getUserId() != null && !s.getUserId().isBlank()) {
+                    String raw = s.getFullName();
+                    String dn = raw != null ? raw.trim() : "";
+                    if (!dn.isEmpty()) {
+                        out.add(new StudentClassmateOptionResponse(peerId, dn));
+                    }
+                }
+            });
+        }
+        out.sort(Comparator.comparing(StudentClassmateOptionResponse::displayName, String.CASE_INSENSITIVE_ORDER));
+        return out;
     }
 
     /**

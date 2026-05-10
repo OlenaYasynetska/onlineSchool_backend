@@ -8,6 +8,7 @@ public record ChatConversationSummaryResponse(
         String peerKind,
         String peerDisplayName,
         String lastMessagePreview,
-        Instant lastMessageAt
+        Instant lastMessageAt,
+        int unreadCount
 ) {
 }

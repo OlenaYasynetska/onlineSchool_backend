@@ -1,7 +1,7 @@
 package com.education.web.homework;
 
 import com.education.web.homework.dto.HomeworkSubmissionResponse;
-import com.education.web.homework.dto.StudentDashboardContextResponse;
+import com.education.web.homework.dto.StudentClassmateOptionResponse;
 import com.education.web.homework.dto.StudentGroupOptionResponse;
 import com.education.web.homework.dto.StudentMyStarsResponse;
 import com.education.web.homework.dto.TeacherOptionShortResponse;
@@ -36,6 +36,11 @@ public class StudentHomeworkPortalController {
     @GetMapping("/teachers")
     public List<TeacherOptionShortResponse> teachers(@RequestParam("userId") @NotBlank String userId) {
         return service.listTeachersForStudent(userId);
+    }
+
+    @GetMapping("/classmates")
+    public List<StudentClassmateOptionResponse> classmates(@RequestParam("userId") @NotBlank String userId) {
+        return service.listClassmatesForStudent(userId);
     }
 
     @GetMapping("/groups")

@@ -59,19 +59,39 @@ public class ChatService {
     public OpenConversationResponse openConversation(String userId, String peerEntityId, String peerKind) {
         ChatEligibilityService.ResolvedChatParticipants p = eligibility.resolveForOpenChat(userId, peerEntityId, peerKind);
         Instant now = Instant.now();
-        ChatConversationDocument conv = conversations
-                .findByTeacherRecordIdAndStudentRecordId(p.teacherRecordId(), p.studentRecordId())
-                .orElseGet(() -> conversations.save(ChatConversationDocument.builder()
-                        .id(UUID.randomUUID().toString())
-                        .schoolId(p.schoolId())
-                        .teacherRecordId(p.teacherRecordId())
-                        .studentRecordId(p.studentRecordId())
-                        .teacherUserId(p.teacherUserId())
-                        .studentUserId(p.studentUserId())
-                        .createdAt(now)
-                        .lastMessageAt(now)
-                        .lastMessagePreview("")
-                        .build()));
+        ChatConversationDocument conv;
+        if (p.studentPeerChat()) {
+            conv = conversations
+                    .findByStudentPeerLowRecordIdAndStudentPeerHighRecordIdAndStudentPeerChatIsTrue(
+                            p.studentPeerLowRecordId(),
+                            p.studentPeerHighRecordId())
+                    .orElseGet(() -> conversations.save(ChatConversationDocument.builder()
+                            .id(UUID.randomUUID().toString())
+                            .schoolId(p.schoolId())
+                            .studentPeerChat(true)
+                            .studentPeerLowRecordId(p.studentPeerLowRecordId())
+                            .studentPeerHighRecordId(p.studentPeerHighRecordId())
+                            .studentPeerLowUserId(p.studentPeerLowUserId())
+                            .studentPeerHighUserId(p.studentPeerHighUserId())
+                            .createdAt(now)
+                            .lastMessageAt(now)
+                            .lastMessagePreview("")
+                            .build()));
+        } else {
+            conv = conversations
+                    .findByTeacherRecordIdAndStudentRecordId(p.teacherRecordId(), p.studentRecordId())
+                    .orElseGet(() -> conversations.save(ChatConversationDocument.builder()
+                            .id(UUID.randomUUID().toString())
+                            .schoolId(p.schoolId())
+                            .teacherRecordId(p.teacherRecordId())
+                            .studentRecordId(p.studentRecordId())
+                            .teacherUserId(p.teacherUserId())
+                            .studentUserId(p.studentUserId())
+                            .createdAt(now)
+                            .lastMessageAt(now)
+                            .lastMessagePreview("")
+                            .build()));
+        }
         return new OpenConversationResponse(conv.getId());
     }
 
@@ -88,15 +108,27 @@ public class ChatService {
 
         List<ChatConversationSummaryResponse> out = new ArrayList<>(rows.size());
         for (ChatConversationDocument c : rows) {
-            out.add(toSummary(userId, role, c));
+            out.add(toSummary(userId, c));
         }
         return out;
     }
 
-    private ChatConversationSummaryResponse toSummary(
-            String currentUserId,
-            UserRole role,
-            ChatConversationDocument c) {
+    private ChatConversationSummaryResponse toSummary(String currentUserId, ChatConversationDocument c) {
+        if (Boolean.TRUE.equals(c.getStudentPeerChat())) {
+            boolean iAmLow = currentUserId.equals(c.getStudentPeerLowUserId());
+            String peerEntityId = iAmLow ? c.getStudentPeerHighRecordId() : c.getStudentPeerLowRecordId();
+            String peerName = students.findById(peerEntityId).map(StudentJpaEntity::getFullName).orElse("Unknown");
+            int unread = unreadCountForViewer(currentUserId, c);
+            return new ChatConversationSummaryResponse(
+                    c.getId(),
+                    peerEntityId,
+                    "student",
+                    peerName,
+                    c.getLastMessagePreview() != null ? c.getLastMessagePreview() : "",
+                    c.getLastMessageAt(),
+                    unread);
+        }
+
         boolean iAmTeacher = currentUserId.equals(c.getTeacherUserId());
         String peerKind = iAmTeacher ? "student" : "teacher";
         String peerEntityId = iAmTeacher ? c.getStudentRecordId() : c.getTeacherRecordId();
@@ -104,13 +136,31 @@ public class ChatService {
                 ? students.findById(c.getStudentRecordId()).map(StudentJpaEntity::getFullName).orElse("Unknown")
                 : teachers.findById(c.getTeacherRecordId()).map(this::formatTeacherName).orElse("Unknown");
 
+        int unread = unreadCountForViewer(currentUserId, c);
         return new ChatConversationSummaryResponse(
                 c.getId(),
                 peerEntityId,
                 peerKind,
                 peerName,
                 c.getLastMessagePreview() != null ? c.getLastMessagePreview() : "",
-                c.getLastMessageAt());
+                c.getLastMessageAt(),
+                unread);
+    }
+
+    private int unreadCountForViewer(String viewerUserId, ChatConversationDocument c) {
+        Instant lastRead;
+        if (Boolean.TRUE.equals(c.getStudentPeerChat())) {
+            lastRead = viewerUserId.equals(c.getStudentPeerLowUserId())
+                    ? c.getTeacherLastReadAt()
+                    : c.getStudentLastReadAt();
+        } else {
+            lastRead = viewerUserId.equals(c.getTeacherUserId())
+                    ? c.getTeacherLastReadAt()
+                    : c.getStudentLastReadAt();
+        }
+        Instant after = lastRead != null ? lastRead : Instant.EPOCH;
+        long n = messages.countUnreadFromOthers(c.getId(), viewerUserId, after);
+        return n > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) n;
     }
 
     private String formatTeacherName(TeacherEntity t) {
@@ -131,12 +181,7 @@ public class ChatService {
         }
         ChatConversationDocument conv = conversations.findById(conversationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
-        eligibility.ensureParticipantUser(userId, new ChatEligibilityService.ResolvedChatParticipants(
-                conv.getSchoolId(),
-                conv.getTeacherRecordId(),
-                conv.getStudentRecordId(),
-                conv.getTeacherUserId(),
-                conv.getStudentUserId()));
+        eligibility.ensureParticipantUser(userId, eligibility.participantsFromConversation(conv));
 
         var page = PageRequest.of(0, limit);
         List<ChatMessageDocument> batch = before != null
@@ -163,12 +208,7 @@ public class ChatService {
 
         ChatConversationDocument conv = conversations.findById(conversationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
-        ChatEligibilityService.ResolvedChatParticipants p = new ChatEligibilityService.ResolvedChatParticipants(
-                conv.getSchoolId(),
-                conv.getTeacherRecordId(),
-                conv.getStudentRecordId(),
-                conv.getTeacherUserId(),
-                conv.getStudentUserId());
+        ChatEligibilityService.ResolvedChatParticipants p = eligibility.participantsFromConversation(conv);
         eligibility.ensureParticipantUser(userId, p);
 
         Instant now = Instant.now();
@@ -185,6 +225,27 @@ public class ChatService {
         conversations.save(conv);
 
         return new ChatMessageResponse(saved.getId(), saved.getSenderUserId(), saved.getBody(), saved.getCreatedAt());
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void markConversationRead(String userId, String conversationId) {
+        ChatConversationDocument conv = conversations.findById(conversationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Conversation not found"));
+        ChatEligibilityService.ResolvedChatParticipants p = eligibility.participantsFromConversation(conv);
+        eligibility.ensureParticipantUser(userId, p);
+        Instant now = Instant.now();
+        if (Boolean.TRUE.equals(conv.getStudentPeerChat())) {
+            if (userId.equals(conv.getStudentPeerLowUserId())) {
+                conv.setTeacherLastReadAt(now);
+            } else {
+                conv.setStudentLastReadAt(now);
+            }
+        } else if (userId.equals(conv.getTeacherUserId())) {
+            conv.setTeacherLastReadAt(now);
+        } else {
+            conv.setStudentLastReadAt(now);
+        }
+        conversations.save(conv);
     }
 
     private static String preview(String body) {

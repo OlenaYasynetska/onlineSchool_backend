@@ -62,6 +62,14 @@ public class ChatController {
         return chatService.listMessages(userId, conversationId, before, limit);
     }
 
+    @PostMapping("/conversations/{conversationId}/read")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void markRead(
+            @RequestParam("userId") @NotBlank String userId,
+            @PathVariable("conversationId") String conversationId) {
+        chatService.markConversationRead(userId, conversationId);
+    }
+
     @PostMapping("/conversations/{conversationId}/messages")
     @ResponseStatus(HttpStatus.CREATED)
     public ChatMessageResponse postMessage(
