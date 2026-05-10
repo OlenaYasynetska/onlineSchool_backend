@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Перевірка ролі та зв’язку «вчитель призначений на групу учня» (MySQL).
+ * Перевірка ролі та належності учня й учителя до однієї школи (MySQL).
  */
 @Service
 @ConditionalOnProperty(name = "education.chat.mongodb-enabled", havingValue = "true")
@@ -22,17 +22,14 @@ public class ChatEligibilityService {
     private final UserJpaRepository users;
     private final TeacherJpaRepository teachers;
     private final SpringDataStudentJpaRepository students;
-    private final ChatTeacherStudentLinkService linkService;
 
     public ChatEligibilityService(
             UserJpaRepository users,
             TeacherJpaRepository teachers,
-            SpringDataStudentJpaRepository students,
-            ChatTeacherStudentLinkService linkService) {
+            SpringDataStudentJpaRepository students) {
         this.users = users;
         this.teachers = teachers;
         this.students = students;
-        this.linkService = linkService;
     }
 
     public ResolvedChatParticipants resolveForOpenChat(
@@ -75,9 +72,6 @@ public class ChatEligibilityService {
         if (!student.getSchoolId().equals(teacher.getSchool().getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not in the same school");
         }
-        if (!linkService.sharesGroup(teacher.getId(), student.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "No shared group with this teacher");
-        }
 
         return new ResolvedChatParticipants(
                 student.getSchoolId(),
@@ -99,9 +93,6 @@ public class ChatEligibilityService {
 
         if (!student.getSchoolId().equals(teacher.getSchool().getId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not in the same school");
-        }
-        if (!linkService.sharesGroup(teacher.getId(), student.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Student is not in your groups");
         }
 
         return new ResolvedChatParticipants(
