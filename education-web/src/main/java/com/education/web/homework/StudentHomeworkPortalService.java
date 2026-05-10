@@ -21,8 +21,10 @@ import com.education.web.homework.dto.StudentMyStarsResponse;
 import com.education.web.homework.dto.SubjectHomeworkProgressRow;
 import com.education.web.homework.dto.SubjectStarTotalRow;
 import com.education.web.homework.dto.TeacherOptionShortResponse;
+import com.education.web.chat.ChatTeacherStudentLinkService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +70,7 @@ public class StudentHomeworkPortalService {
     private final TeacherSubjectJpaRepository teacherSubjects;
 
     private final HomeworkSubmissionFileLoader fileLoader;
+    private final ObjectProvider<ChatTeacherStudentLinkService> chatTeacherStudentLink;
 
     public StudentHomeworkPortalService(
             SpringDataStudentJpaRepository students,
@@ -77,7 +80,8 @@ public class StudentHomeworkPortalService {
             HomeworkPortalSubmissionJpaRepository submissions,
             OrganizationJpaRepository organizations,
             TeacherSubjectJpaRepository teacherSubjects,
-            HomeworkSubmissionFileLoader fileLoader
+            HomeworkSubmissionFileLoader fileLoader,
+            ObjectProvider<ChatTeacherStudentLinkService> chatTeacherStudentLink
     ) {
         this.students = students;
         this.teachers = teachers;
@@ -87,6 +91,7 @@ public class StudentHomeworkPortalService {
         this.organizations = organizations;
         this.teacherSubjects = teacherSubjects;
         this.fileLoader = fileLoader;
+        this.chatTeacherStudentLink = chatTeacherStudentLink;
     }
 
     /** Завантаження / перегляд власного вкладення учнем (лише своя здача). */
@@ -121,7 +126,9 @@ public class StudentHomeworkPortalService {
 
     public List<TeacherOptionShortResponse> listTeachersForStudent(String userId) {
         StudentJpaEntity st = requireStudentByUser(userId);
+        ChatTeacherStudentLinkService link = chatTeacherStudentLink.getIfAvailable();
         return teachers.findAllBySchoolIdWithUserOrderByName(st.getSchoolId()).stream()
+                .filter(t -> link == null || link.sharesGroup(t.getId(), st.getId()))
                 .map(t -> {
                     var u = t.getUser();
                     String dn = (u.getFirstName() + " " + u.getLastName()).trim();
