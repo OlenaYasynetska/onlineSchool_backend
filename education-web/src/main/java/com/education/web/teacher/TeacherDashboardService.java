@@ -11,6 +11,7 @@ import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
 import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.schooladmin.dto.SchoolGroupCardResponse;
 import com.education.web.schooladmin.service.GroupEnrollmentCountService;
+import com.education.web.homework.dto.TeacherOptionShortResponse;
 import com.education.web.schooladmin.dto.StudentRowResponse;
 import com.education.web.teacher.dto.TeacherActivityEntryResponse;
 import org.springframework.http.HttpStatus;
@@ -71,23 +72,18 @@ public class TeacherDashboardService {
     }
 
     /**
-     * Студенти, зараховані хоча б в одну з груп цього вчителя (дані з БД).
+     * Усі студенти школи вчителя (MySQL учні з логіном — як у домашках / чаті).
      */
     @Transactional(readOnly = true)
     public List<StudentRowResponse> listRosterForTeacherUser(String userId) {
         TeacherEntity teacher = requireTeacher(userId);
         String schoolId = teacher.getSchool().getId();
-        List<SchoolGroupStudentEntity> links =
-                enrollmentLinksForTeacher(teacher.getId(), schoolId);
-        Map<String, List<String>> groupNamesByStudent = groupNamesByStudent(links);
-        if (groupNamesByStudent.isEmpty()) {
-            return List.of();
-        }
-        Set<String> studentIds = groupNamesByStudent.keySet();
+        List<SchoolGroupStudentEntity> allSchoolLinks =
+                schoolGroupStudents.findByGroup_Organization_Id(schoolId);
+        Map<String, List<String>> groupNamesByStudent = groupNamesByStudent(allSchoolLinks);
         List<StudentView> schoolStudents =
                 getStudentsBySchoolUseCase.executeBySchoolId(schoolId);
         return schoolStudents.stream()
-                .filter(s -> studentIds.contains(s.id()))
                 .map(s -> new StudentRowResponse(
                         s.id(),
                         s.fullName(),
@@ -96,6 +92,22 @@ public class TeacherDashboardService {
                         groupNamesByStudent.getOrDefault(s.id(), List.of())
                 ))
                 .sorted(Comparator.comparing(StudentRowResponse::fullName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+    }
+
+    /** Інші викладачі тієї ж школи (для контактів / чату). */
+    @Transactional(readOnly = true)
+    public List<TeacherOptionShortResponse> listSchoolColleagueTeachers(String userId) {
+        TeacherEntity me = requireTeacher(userId);
+        String schoolId = me.getSchool().getId();
+        return teachers.findAllBySchoolIdWithUserOrderByName(schoolId).stream()
+                .filter(t -> !t.getId().equals(me.getId()))
+                .map(t -> {
+                    UserEntity u = t.getUser();
+                    String dn = (u.getFirstName() + " " + u.getLastName()).trim();
+                    return new TeacherOptionShortResponse(t.getId(), dn);
+                })
+                .sorted(Comparator.comparing(TeacherOptionShortResponse::displayName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
     }
 

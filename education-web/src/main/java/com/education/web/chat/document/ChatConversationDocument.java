@@ -49,6 +49,18 @@ public class ChatConversationDocument {
     /** Діалог між двома учнями (інакше учитель–учень). */
     private Boolean studentPeerChat;
 
+    /** Діалог між двома вчителями тієї ж школи. */
+    private Boolean teacherPeerChat;
+
+    /** Упорядкована пара {@code teachers.id}: low.compareTo(high) <= 0. */
+    private String teacherPeerLowRecordId;
+
+    private String teacherPeerHighRecordId;
+
+    private String teacherPeerLowUserId;
+
+    private String teacherPeerHighUserId;
+
     /** Упорядкована пара {@code students.id}: low.compareTo(high) <= 0. */
     private String studentPeerLowRecordId;
 

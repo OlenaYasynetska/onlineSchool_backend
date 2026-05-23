@@ -5,7 +5,6 @@ import com.education.infrastructure.student.StudentJpaEntity;
 import com.education.web.auth.model.TeacherEntity;
 import com.education.web.auth.model.UserEntity;
 import com.education.web.auth.model.UserRole;
-import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
 import com.education.web.auth.repository.TeacherJpaRepository;
 import com.education.web.auth.repository.UserJpaRepository;
 import com.education.web.chat.document.ChatConversationDocument;
@@ -14,11 +13,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.HashSet;
-import java.util.Set;
-
 /**
- * Перевірка ролі та доступу до чату (учитель–учень або учень–учень з однієї групи / школи).
+ * Перевірка ролі та доступу до чату: та сама школа; учень–учень і вчитель–вчитель без обмеження спільної групи.
  */
 @Service
 @ConditionalOnProperty(name = "education.chat.mongodb-enabled", havingValue = "true")
@@ -27,20 +23,25 @@ public class ChatEligibilityService {
     private final UserJpaRepository users;
     private final TeacherJpaRepository teachers;
     private final SpringDataStudentJpaRepository students;
-    private final SchoolGroupStudentJpaRepository groupStudents;
 
     public ChatEligibilityService(
             UserJpaRepository users,
             TeacherJpaRepository teachers,
-            SpringDataStudentJpaRepository students,
-            SchoolGroupStudentJpaRepository groupStudents) {
+            SpringDataStudentJpaRepository students) {
         this.users = users;
         this.teachers = teachers;
         this.students = students;
-        this.groupStudents = groupStudents;
     }
 
     public ResolvedChatParticipants participantsFromConversation(ChatConversationDocument c) {
+        if (Boolean.TRUE.equals(c.getTeacherPeerChat())) {
+            return ResolvedChatParticipants.teacherPeers(
+                    c.getSchoolId(),
+                    c.getTeacherPeerLowRecordId(),
+                    c.getTeacherPeerHighRecordId(),
+                    c.getTeacherPeerLowUserId(),
+                    c.getTeacherPeerHighUserId());
+        }
         if (Boolean.TRUE.equals(c.getStudentPeerChat())) {
             return ResolvedChatParticipants.studentPeers(
                     c.getSchoolId(),
@@ -70,10 +71,13 @@ public class ChatEligibilityService {
 
         String peerKind = peerKindRaw == null ? "" : peerKindRaw.trim().toLowerCase();
         if ("teacher".equals(peerKind)) {
-            if (role != UserRole.STUDENT) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "peerKind=teacher is for student accounts");
+            if (role == UserRole.STUDENT) {
+                return resolveStudentFromTeacherPeer(currentUserId, peerEntityId);
             }
-            return resolveStudentFromTeacherPeer(currentUserId, peerEntityId);
+            if (role == UserRole.TEACHER) {
+                return resolveTeacherToTeacherPeer(currentUserId, peerEntityId);
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "peerKind=teacher is for teachers or students");
         }
         if ("student".equals(peerKind)) {
             if (role == UserRole.TEACHER) {
@@ -140,16 +144,13 @@ public class ChatEligibilityService {
         StudentJpaEntity peer = students.findById(peerStudentRecordId.trim())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
         if (peer.getUserId() == null || peer.getUserId().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "This classmate has no login yet");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Peer student has no login yet");
         }
         if (peer.getId().equals(me.getId())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot chat with yourself");
         }
         if (!peer.getSchoolId().equals(me.getSchoolId())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not in the same school");
-        }
-        if (!shareClassGroup(me.getId(), peer.getId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not in the same class group");
         }
 
         String lowRec;
@@ -170,14 +171,40 @@ public class ChatEligibilityService {
         return ResolvedChatParticipants.studentPeers(me.getSchoolId(), lowRec, highRec, lowUser, highUser);
     }
 
-    private boolean shareClassGroup(String studentIdA, String studentIdB) {
-        Set<String> a = new HashSet<>();
-        groupStudents.findByStudentIdFetchGroup(studentIdA).forEach(l -> a.add(l.getGroup().getId()));
-        if (a.isEmpty()) {
-            return false;
+    private ResolvedChatParticipants resolveTeacherToTeacherPeer(String teacherUserId, String peerTeacherRecordId) {
+        TeacherEntity me = teachers.findByUser_Id(teacherUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Teacher profile not found"));
+        if (me.getUser() == null || me.getUser().getId() == null || me.getUser().getId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Teacher has no user account");
         }
-        return groupStudents.findByStudentIdFetchGroup(studentIdB).stream()
-                .anyMatch(l -> a.contains(l.getGroup().getId()));
+        TeacherEntity peer = teachers.findById(peerTeacherRecordId.trim())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Teacher not found"));
+        if (peer.getUser() == null || peer.getUser().getId() == null || peer.getUser().getId().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Colleague has no login yet");
+        }
+        if (!me.getSchool().getId().equals(peer.getSchool().getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not in the same school");
+        }
+        if (me.getId().equals(peer.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot chat with yourself");
+        }
+
+        String lowRec;
+        String highRec;
+        String lowUser;
+        String highUser;
+        if (me.getId().compareTo(peer.getId()) <= 0) {
+            lowRec = me.getId();
+            highRec = peer.getId();
+            lowUser = me.getUser().getId();
+            highUser = peer.getUser().getId();
+        } else {
+            lowRec = peer.getId();
+            highRec = me.getId();
+            lowUser = peer.getUser().getId();
+            highUser = me.getUser().getId();
+        }
+        return ResolvedChatParticipants.teacherPeers(me.getSchool().getId(), lowRec, highRec, lowUser, highUser);
     }
 
     public void ensureParticipantUser(String userId, ResolvedChatParticipants participants) {
@@ -189,6 +216,7 @@ public class ChatEligibilityService {
     public record ResolvedChatParticipants(
             String schoolId,
             boolean studentPeerChat,
+            boolean teacherPeerChat,
             String teacherRecordId,
             String studentRecordId,
             String teacherUserId,
@@ -196,7 +224,11 @@ public class ChatEligibilityService {
             String studentPeerLowRecordId,
             String studentPeerHighRecordId,
             String studentPeerLowUserId,
-            String studentPeerHighUserId) {
+            String studentPeerHighUserId,
+            String teacherPeerLowRecordId,
+            String teacherPeerHighRecordId,
+            String teacherPeerLowUserId,
+            String teacherPeerHighUserId) {
 
         public static ResolvedChatParticipants teacherStudent(
                 String schoolId,
@@ -207,10 +239,15 @@ public class ChatEligibilityService {
             return new ResolvedChatParticipants(
                     schoolId,
                     false,
+                    false,
                     teacherRecordId,
                     studentRecordId,
                     teacherUserId,
                     studentUserId,
+                    null,
+                    null,
+                    null,
+                    null,
                     null,
                     null,
                     null,
@@ -226,6 +263,7 @@ public class ChatEligibilityService {
             return new ResolvedChatParticipants(
                     schoolId,
                     true,
+                    false,
                     null,
                     null,
                     null,
@@ -233,12 +271,43 @@ public class ChatEligibilityService {
                     studentPeerLowRecordId,
                     studentPeerHighRecordId,
                     studentPeerLowUserId,
-                    studentPeerHighUserId);
+                    studentPeerHighUserId,
+                    null,
+                    null,
+                    null,
+                    null);
+        }
+
+        public static ResolvedChatParticipants teacherPeers(
+                String schoolId,
+                String teacherPeerLowRecordId,
+                String teacherPeerHighRecordId,
+                String teacherPeerLowUserId,
+                String teacherPeerHighUserId) {
+            return new ResolvedChatParticipants(
+                    schoolId,
+                    false,
+                    true,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    teacherPeerLowRecordId,
+                    teacherPeerHighRecordId,
+                    teacherPeerLowUserId,
+                    teacherPeerHighUserId);
         }
 
         public boolean isParticipant(String userId) {
             if (studentPeerChat) {
                 return userId.equals(studentPeerLowUserId) || userId.equals(studentPeerHighUserId);
+            }
+            if (teacherPeerChat) {
+                return userId.equals(teacherPeerLowUserId) || userId.equals(teacherPeerHighUserId);
             }
             return userId.equals(teacherUserId) || userId.equals(studentUserId);
         }

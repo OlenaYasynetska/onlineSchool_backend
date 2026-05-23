@@ -17,6 +17,11 @@ public interface ChatConversationRepository extends MongoRepository<ChatConversa
             String studentPeerLowRecordId,
             String studentPeerHighRecordId);
 
-    @Query("{ $or: [ { 'teacherUserId': ?0 }, { 'studentUserId': ?0 }, { 'studentPeerLowUserId': ?0 }, { 'studentPeerHighUserId': ?0 } ] }")
+    Optional<ChatConversationDocument> findByTeacherPeerLowRecordIdAndTeacherPeerHighRecordIdAndTeacherPeerChatIsTrue(
+            String teacherPeerLowRecordId,
+            String teacherPeerHighRecordId);
+
+    @Query("{ $or: [ { 'teacherUserId': ?0 }, { 'studentUserId': ?0 }, { 'studentPeerLowUserId': ?0 }, "
+            + "{ 'studentPeerHighUserId': ?0 }, { 'teacherPeerLowUserId': ?0 }, { 'teacherPeerHighUserId': ?0 } ] }")
     List<ChatConversationDocument> findByParticipantUserId(String userId);
 }

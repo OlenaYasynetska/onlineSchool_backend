@@ -63,7 +63,24 @@ public class ChatService {
         ChatEligibilityService.ResolvedChatParticipants p = eligibility.resolveForOpenChat(userId, peerEntityId, peerKind);
         Instant now = Instant.now();
         ChatConversationDocument conv;
-        if (p.studentPeerChat()) {
+        if (p.teacherPeerChat()) {
+            conv = conversations
+                    .findByTeacherPeerLowRecordIdAndTeacherPeerHighRecordIdAndTeacherPeerChatIsTrue(
+                            p.teacherPeerLowRecordId(),
+                            p.teacherPeerHighRecordId())
+                    .orElseGet(() -> conversations.save(ChatConversationDocument.builder()
+                            .id(UUID.randomUUID().toString())
+                            .schoolId(p.schoolId())
+                            .teacherPeerChat(true)
+                            .teacherPeerLowRecordId(p.teacherPeerLowRecordId())
+                            .teacherPeerHighRecordId(p.teacherPeerHighRecordId())
+                            .teacherPeerLowUserId(p.teacherPeerLowUserId())
+                            .teacherPeerHighUserId(p.teacherPeerHighUserId())
+                            .createdAt(now)
+                            .lastMessageAt(now)
+                            .lastMessagePreview("")
+                            .build()));
+        } else if (p.studentPeerChat()) {
             conv = conversations
                     .findByStudentPeerLowRecordIdAndStudentPeerHighRecordIdAndStudentPeerChatIsTrue(
                             p.studentPeerLowRecordId(),
@@ -124,6 +141,27 @@ public class ChatService {
     }
 
     private ChatConversationSummaryResponse toSummary(String currentUserId, ChatConversationDocument c) {
+        if (Boolean.TRUE.equals(c.getTeacherPeerChat())) {
+            if (c.getTeacherPeerLowUserId() == null
+                    || c.getTeacherPeerHighUserId() == null
+                    || c.getTeacherPeerLowRecordId() == null
+                    || c.getTeacherPeerHighRecordId() == null) {
+                throw new IllegalStateException("Incomplete teacher-peer conversation document");
+            }
+            boolean iAmLow = currentUserId.equals(c.getTeacherPeerLowUserId());
+            String peerEntityId =
+                    iAmLow ? c.getTeacherPeerHighRecordId() : c.getTeacherPeerLowRecordId();
+            String peerName = teachers.findById(peerEntityId).map(this::formatTeacherName).orElse("Unknown");
+            int unread = unreadCountForViewer(currentUserId, c);
+            return new ChatConversationSummaryResponse(
+                    c.getId(),
+                    peerEntityId,
+                    "teacher",
+                    peerName,
+                    c.getLastMessagePreview() != null ? c.getLastMessagePreview() : "",
+                    c.getLastMessageAt(),
+                    unread);
+        }
         if (Boolean.TRUE.equals(c.getStudentPeerChat())) {
             if (c.getStudentPeerLowUserId() == null
                     || c.getStudentPeerHighUserId() == null
@@ -172,7 +210,11 @@ public class ChatService {
 
     private int unreadCountForViewer(String viewerUserId, ChatConversationDocument c) {
         Instant lastRead;
-        if (Boolean.TRUE.equals(c.getStudentPeerChat())) {
+        if (Boolean.TRUE.equals(c.getTeacherPeerChat())) {
+            lastRead = viewerUserId.equals(c.getTeacherPeerLowUserId())
+                    ? c.getTeacherLastReadAt()
+                    : c.getStudentLastReadAt();
+        } else if (Boolean.TRUE.equals(c.getStudentPeerChat())) {
             lastRead = viewerUserId.equals(c.getStudentPeerLowUserId())
                     ? c.getTeacherLastReadAt()
                     : c.getStudentLastReadAt();
@@ -257,7 +299,13 @@ public class ChatService {
         ChatEligibilityService.ResolvedChatParticipants p = eligibility.participantsFromConversation(conv);
         eligibility.ensureParticipantUser(userId, p);
         Instant now = Instant.now();
-        if (Boolean.TRUE.equals(conv.getStudentPeerChat())) {
+        if (Boolean.TRUE.equals(conv.getTeacherPeerChat())) {
+            if (userId.equals(conv.getTeacherPeerLowUserId())) {
+                conv.setTeacherLastReadAt(now);
+            } else {
+                conv.setStudentLastReadAt(now);
+            }
+        } else if (Boolean.TRUE.equals(conv.getStudentPeerChat())) {
             if (userId.equals(conv.getStudentPeerLowUserId())) {
                 conv.setTeacherLastReadAt(now);
             } else {

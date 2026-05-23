@@ -2,6 +2,7 @@ package com.education.web.teacher;
 
 import com.education.web.schooladmin.dto.SchoolGroupCardResponse;
 import com.education.web.schooladmin.dto.StudentRowResponse;
+import com.education.web.homework.dto.TeacherOptionShortResponse;
 import com.education.web.teacher.dto.TeacherActivityEntryResponse;
 import com.education.web.teacher.dto.TeacherGroupStatsResponse;
 import com.education.web.teacher.dto.TeacherHomeworkStarsChartResponse;
@@ -41,10 +42,16 @@ public class TeacherDashboardController {
         return teacherDashboardService.listGroupsForTeacherUser(userId);
     }
 
-    /** Студенти, зараховані в групи цього вчителя. */
+    /** Усі студенти школи (для чату та довідників). */
     @GetMapping("/students")
     public List<StudentRowResponse> myStudents(@RequestParam("userId") String userId) {
         return teacherDashboardService.listRosterForTeacherUser(userId);
+    }
+
+    /** Інші вчителі тієї ж школи. */
+    @GetMapping("/colleagues")
+    public List<TeacherOptionShortResponse> colleagues(@RequestParam("userId") String userId) {
+        return teacherDashboardService.listSchoolColleagueTeachers(userId);
     }
 
     /** Останні зарахування на групи (з {@code school_group_students}). */

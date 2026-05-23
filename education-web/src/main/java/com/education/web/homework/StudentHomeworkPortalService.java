@@ -43,7 +43,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -133,35 +132,24 @@ public class StudentHomeworkPortalService {
                 .collect(Collectors.toList());
     }
 
-    /** Інші учні з тих самих груп (з обліковим записом), без себе. */
+    /** Усі інші учні тієї ж школи з обліковим записом, крім себе. */
     @Transactional(readOnly = true)
     public List<StudentClassmateOptionResponse> listClassmatesForStudent(String userId) {
         StudentJpaEntity me = requireStudentByUser(userId);
-        List<SchoolGroupStudentEntity> myLinks = groupStudents.findByStudentIdFetchGroup(me.getId());
-        if (myLinks.isEmpty()) {
-            return List.of();
-        }
-        Set<String> peerIds = new LinkedHashSet<>();
-        for (SchoolGroupStudentEntity link : myLinks) {
-            String gid = link.getGroup().getId();
-            for (SchoolGroupStudentEntity row : groupStudents.findByGroup_IdOrderByStudentIdAsc(gid)) {
-                String sid = row.getStudentId();
-                if (sid != null && !sid.equals(me.getId())) {
-                    peerIds.add(sid);
-                }
-            }
-        }
         List<StudentClassmateOptionResponse> out = new ArrayList<>();
-        for (String peerId : peerIds) {
-            students.findById(peerId).ifPresent(s -> {
-                if (s.getUserId() != null && !s.getUserId().isBlank()) {
-                    String raw = s.getFullName();
-                    String dn = raw != null ? raw.trim() : "";
-                    if (!dn.isEmpty()) {
-                        out.add(new StudentClassmateOptionResponse(peerId, dn));
-                    }
-                }
-            });
+        for (StudentJpaEntity s : students.findBySchoolIdOrderByCreatedAtAsc(me.getSchoolId())) {
+            if (s.getId().equals(me.getId())) {
+                continue;
+            }
+            if (s.getUserId() == null || s.getUserId().isBlank()) {
+                continue;
+            }
+            String raw = s.getFullName();
+            String dn = raw != null ? raw.trim() : "";
+            if (dn.isEmpty()) {
+                continue;
+            }
+            out.add(new StudentClassmateOptionResponse(s.getId(), dn));
         }
         out.sort(Comparator.comparing(StudentClassmateOptionResponse::displayName, String.CASE_INSENSITIVE_ORDER));
         return out;
