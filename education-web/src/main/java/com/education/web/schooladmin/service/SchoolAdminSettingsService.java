@@ -3,6 +3,7 @@ package com.education.web.schooladmin.service;
 import com.education.web.auth.model.OrganizationEntity;
 import com.education.web.auth.repository.OrganizationJpaRepository;
 import com.education.web.grading.GradingMethod;
+import com.education.web.grading.GradingScale;
 import com.education.web.schooladmin.dto.SchoolSettingsResponse;
 import com.education.web.schooladmin.dto.UpdateSchoolSettingsRequest;
 import org.springframework.http.HttpStatus;
@@ -31,8 +32,13 @@ public class SchoolAdminSettingsService {
         if (req == null || req.gradingMethod() == null || req.gradingMethod().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "gradingMethod is required");
         }
+        if (req.gradingScale() == null || req.gradingScale().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "gradingScale is required");
+        }
         GradingMethod method = GradingMethod.fromWire(req.gradingMethod());
+        GradingScale scale = GradingScale.fromWire(req.gradingScale());
         org.setGradingMethod(method.wireValue());
+        org.setGradingScale(scale.wireValue());
         organizations.save(org);
         return toResponse(org);
     }
@@ -47,6 +53,10 @@ public class SchoolAdminSettingsService {
     }
 
     private static SchoolSettingsResponse toResponse(OrganizationEntity org) {
-        return new SchoolSettingsResponse(org.getId(), GradingMethod.fromWire(org.getGradingMethod()).wireValue());
+        return new SchoolSettingsResponse(
+                org.getId(),
+                GradingMethod.fromWire(org.getGradingMethod()).wireValue(),
+                GradingScale.fromWire(org.getGradingScale()).wireValue()
+        );
     }
 }

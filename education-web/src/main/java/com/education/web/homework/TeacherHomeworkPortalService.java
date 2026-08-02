@@ -8,9 +8,13 @@ import com.education.web.auth.model.TeacherEntity;
 import com.education.web.auth.repository.SchoolGroupJpaRepository;
 import com.education.web.auth.repository.SchoolGroupStudentJpaRepository;
 import com.education.web.auth.repository.TeacherJpaRepository;
+import com.education.web.grading.GradingStrategyResolver;
 import com.education.web.homework.dto.GradeHomeworkRequest;
 import com.education.web.homework.dto.HomeworkFileDownload;
 import com.education.web.homework.dto.HomeworkSubmissionResponse;
+import com.education.web.homework.dto.TeacherHomeworkGradingContextResponse;
+import com.education.web.grading.GradingMethod;
+import com.education.web.grading.GradingScale;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +35,7 @@ public class TeacherHomeworkPortalService {
     private final SchoolGroupJpaRepository schoolGroups;
     private final SchoolGroupStudentJpaRepository groupStudents;
     private final HomeworkSubmissionFileLoader fileLoader;
+    private final GradingStrategyResolver gradingResolver;
 
     public TeacherHomeworkPortalService(
             TeacherJpaRepository teachers,
@@ -38,7 +43,8 @@ public class TeacherHomeworkPortalService {
             SpringDataStudentJpaRepository students,
             SchoolGroupJpaRepository schoolGroups,
             SchoolGroupStudentJpaRepository groupStudents,
-            HomeworkSubmissionFileLoader fileLoader
+            HomeworkSubmissionFileLoader fileLoader,
+            GradingStrategyResolver gradingResolver
     ) {
         this.teachers = teachers;
         this.submissions = submissions;
@@ -46,6 +52,21 @@ public class TeacherHomeworkPortalService {
         this.schoolGroups = schoolGroups;
         this.groupStudents = groupStudents;
         this.fileLoader = fileLoader;
+        this.gradingResolver = gradingResolver;
+    }
+
+    @Transactional(readOnly = true)
+    public TeacherHomeworkGradingContextResponse gradingContext(String teacherUserId) {
+        TeacherEntity teacher = requireTeacher(teacherUserId);
+        String schoolId = teacher.getSchool().getId();
+        GradingMethod method = gradingResolver.methodForOrganization(schoolId);
+        GradingScale scale = gradingResolver.scaleForOrganization(schoolId);
+        return new TeacherHomeworkGradingContextResponse(
+                method.wireValue(),
+                scale.wireValue(),
+                scale.minGrade(),
+                scale.maxGrade()
+        );
     }
 
     @Transactional(readOnly = true)
@@ -80,6 +101,11 @@ public class TeacherHomeworkPortalService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Already graded or invalid status");
         }
         int stars = req.stars();
+        try {
+            gradingResolver.validateGradeForOrganization(teacher.getSchool().getId(), stars);
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
         s.setStars(stars);
         s.setTeacherFeedback(req.feedback() != null ? req.feedback().trim() : null);
         s.setGradedAt(Instant.now());

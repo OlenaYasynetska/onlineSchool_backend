@@ -23,6 +23,7 @@ import com.education.web.homework.dto.SubjectHomeworkProgressRow;
 import com.education.web.homework.dto.SubjectStarTotalRow;
 import com.education.web.homework.dto.TeacherOptionShortResponse;
 import com.education.web.grading.GradingMethod;
+import com.education.web.grading.GradingScale;
 import com.education.web.grading.GradingStrategyResolver;
 import com.education.web.grading.StarGradingStrategy;
 import org.slf4j.Logger;
@@ -205,6 +206,8 @@ public class StudentHomeworkPortalService {
         GradingMethod gradingMethod = gradingStrategyResolver.methodForOrganization(st.getSchoolId());
         StarGradingStrategy strategy = gradingStrategyResolver.strategyFor(gradingMethod);
         String gradingMethodWire = gradingMethod.wireValue();
+        GradingScale gradingScale = gradingStrategyResolver.scaleForOrganization(st.getSchoolId());
+        String gradingScaleWire = gradingScale.wireValue();
 
         List<HomeworkPortalSubmissionEntity> allSubs =
                 submissions.findByStudentIdOrderBySubmittedAtDesc(st.getId());
@@ -380,6 +383,7 @@ public class StudentHomeworkPortalService {
 
         return new StudentMyStarsResponse(
                 gradingMethodWire,
+                gradingScaleWire,
                 totalStars,
                 weekGain,
                 monthGain,

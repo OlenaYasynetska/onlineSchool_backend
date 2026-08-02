@@ -31,6 +31,20 @@ public class GradingStrategyResolver {
                 .orElse(GradingMethod.SUM);
     }
 
+    public GradingScale scaleForOrganization(String organizationId) {
+        if (organizationId == null || organizationId.isBlank()) {
+            return GradingScale.STARS_1_3;
+        }
+        return organizations.findById(organizationId.trim())
+                .map(OrganizationEntity::getGradingScale)
+                .map(GradingScale::fromWire)
+                .orElse(GradingScale.STARS_1_3);
+    }
+
+    public void validateGradeForOrganization(String organizationId, int grade) {
+        scaleForOrganization(organizationId).validateGrade(grade);
+    }
+
     public StarGradingStrategy strategyForOrganization(String organizationId) {
         return strategyFor(methodForOrganization(organizationId));
     }

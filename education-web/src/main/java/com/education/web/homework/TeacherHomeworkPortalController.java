@@ -1,7 +1,7 @@
 package com.education.web.homework;
 
 import com.education.web.homework.dto.GradeHomeworkRequest;
-import com.education.web.homework.dto.HomeworkSubmissionResponse;
+import com.education.web.homework.dto.TeacherHomeworkGradingContextResponse;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +23,11 @@ public class TeacherHomeworkPortalController {
 
     public TeacherHomeworkPortalController(TeacherHomeworkPortalService service) {
         this.service = service;
+    }
+
+    @GetMapping("/grading-context")
+    public TeacherHomeworkGradingContextResponse gradingContext(@RequestParam("userId") String userId) {
+        return service.gradingContext(userId);
     }
 
     @GetMapping("/pending")

@@ -58,6 +58,10 @@ public class OrganizationEntity {
     @Column(name = "grading_method", nullable = false, length = 16)
     private String gradingMethod = "sum";
 
+    /** {@code stars_1_3} | {@code austrian_1_5} — шкала оцінювання ДЗ. */
+    @Column(name = "grading_scale", nullable = false, length = 16)
+    private String gradingScale = "stars_1_3";
+
     @PrePersist
     void onCreate() {
         if (this.id == null || this.id.isBlank()) {
@@ -71,6 +75,9 @@ public class OrganizationEntity {
         }
         if (this.gradingMethod == null || this.gradingMethod.isBlank()) {
             this.gradingMethod = "sum";
+        }
+        if (this.gradingScale == null || this.gradingScale.isBlank()) {
+            this.gradingScale = "stars_1_3";
         }
     }
 
@@ -176,6 +183,14 @@ public class OrganizationEntity {
 
     public void setGradingMethod(String gradingMethod) {
         this.gradingMethod = gradingMethod;
+    }
+
+    public String getGradingScale() {
+        return gradingScale;
+    }
+
+    public void setGradingScale(String gradingScale) {
+        this.gradingScale = gradingScale;
     }
 }
 

@@ -7,6 +7,8 @@ import java.util.Map;
 public record StudentMyStarsResponse(
         /** {@code sum} або {@code average} — з налаштувань школи. */
         String gradingMethod,
+        /** {@code stars_1_3} або {@code austrian_1_5}. */
+        String gradingScale,
         double totalStars,
         double weekGain,
         double monthGain,
