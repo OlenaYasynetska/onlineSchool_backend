@@ -1,6 +1,7 @@
 package com.education.web.homework;
 
 import com.education.web.homework.dto.GradeHomeworkRequest;
+import com.education.web.homework.dto.HomeworkSubmissionResponse;
 import com.education.web.homework.dto.TeacherHomeworkGradingContextResponse;
 import jakarta.validation.Valid;
 import org.springframework.core.io.Resource;
