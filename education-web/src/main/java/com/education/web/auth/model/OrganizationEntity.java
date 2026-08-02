@@ -54,6 +54,10 @@ public class OrganizationEntity {
     @Column(name = "country", length = 64)
     private String country;
 
+    /** {@code sum} | {@code average} — спосіб агрегації зірок з оцінених ДЗ. */
+    @Column(name = "grading_method", nullable = false, length = 16)
+    private String gradingMethod = "sum";
+
     @PrePersist
     void onCreate() {
         if (this.id == null || this.id.isBlank()) {
@@ -64,6 +68,9 @@ public class OrganizationEntity {
         }
         if (this.totalReceived == null) {
             this.totalReceived = BigDecimal.ZERO;
+        }
+        if (this.gradingMethod == null || this.gradingMethod.isBlank()) {
+            this.gradingMethod = "sum";
         }
     }
 
@@ -161,6 +168,14 @@ public class OrganizationEntity {
 
     public void setCountry(String country) {
         this.country = country;
+    }
+
+    public String getGradingMethod() {
+        return gradingMethod;
+    }
+
+    public void setGradingMethod(String gradingMethod) {
+        this.gradingMethod = gradingMethod;
     }
 }
 

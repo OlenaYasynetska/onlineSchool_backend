@@ -22,6 +22,9 @@ import com.education.web.homework.dto.StudentMyStarsResponse;
 import com.education.web.homework.dto.SubjectHomeworkProgressRow;
 import com.education.web.homework.dto.SubjectStarTotalRow;
 import com.education.web.homework.dto.TeacherOptionShortResponse;
+import com.education.web.grading.GradingMethod;
+import com.education.web.grading.GradingStrategyResolver;
+import com.education.web.grading.StarGradingStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -70,6 +73,7 @@ public class StudentHomeworkPortalService {
     private final TeacherSubjectJpaRepository teacherSubjects;
 
     private final HomeworkSubmissionFileLoader fileLoader;
+    private final GradingStrategyResolver gradingStrategyResolver;
 
     public StudentHomeworkPortalService(
             SpringDataStudentJpaRepository students,
@@ -79,7 +83,8 @@ public class StudentHomeworkPortalService {
             HomeworkPortalSubmissionJpaRepository submissions,
             OrganizationJpaRepository organizations,
             TeacherSubjectJpaRepository teacherSubjects,
-            HomeworkSubmissionFileLoader fileLoader
+            HomeworkSubmissionFileLoader fileLoader,
+            GradingStrategyResolver gradingStrategyResolver
     ) {
         this.students = students;
         this.teachers = teachers;
@@ -89,6 +94,7 @@ public class StudentHomeworkPortalService {
         this.organizations = organizations;
         this.teacherSubjects = teacherSubjects;
         this.fileLoader = fileLoader;
+        this.gradingStrategyResolver = gradingStrategyResolver;
     }
 
     /** Завантаження / перегляд власного вкладення учнем (лише своя здача). */
@@ -196,6 +202,10 @@ public class StudentHomeworkPortalService {
     @Transactional(readOnly = true)
     public StudentMyStarsResponse myStars(String userId, LocalDate chartFromOpt, LocalDate chartToOpt) {
         StudentJpaEntity st = requireStudentByUser(userId);
+        GradingMethod gradingMethod = gradingStrategyResolver.methodForOrganization(st.getSchoolId());
+        StarGradingStrategy strategy = gradingStrategyResolver.strategyFor(gradingMethod);
+        String gradingMethodWire = gradingMethod.wireValue();
+
         List<HomeworkPortalSubmissionEntity> allSubs =
                 submissions.findByStudentIdOrderBySubmittedAtDesc(st.getId());
         List<HomeworkPortalSubmissionEntity> graded = allSubs.stream()
@@ -218,38 +228,46 @@ public class StudentHomeworkPortalService {
                         e.getKey(),
                         e.getValue()[0],
                         e.getValue()[1],
-                        e.getValue()[2]))
+                        strategy.aggregateSumAndCount(e.getValue()[2], e.getValue()[1])))
                 .toList();
 
-        int totalStars = graded.stream()
-                .mapToInt(h -> h.getStars() != null ? h.getStars() : 0)
-                .sum();
+        List<Integer> allStarValues = graded.stream()
+                .map(h -> h.getStars() != null ? h.getStars() : 0)
+                .toList();
+        double totalStars = strategy.aggregateValues(allStarValues);
 
         Instant now = Instant.now();
         Instant weekAgo = now.minus(7, ChronoUnit.DAYS);
         Instant monthAgo = now.minus(30, ChronoUnit.DAYS);
-        int weekGain = 0;
-        int monthGain = 0;
+        List<Integer> weekValues = new ArrayList<>();
+        List<Integer> monthValues = new ArrayList<>();
         for (HomeworkPortalSubmissionEntity h : graded) {
             Instant g = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
-            int add = h.getStars() != null ? h.getStars() : 0;
+            int star = h.getStars() != null ? h.getStars() : 0;
             if (g.isAfter(weekAgo)) {
-                weekGain += add;
+                weekValues.add(star);
             }
             if (g.isAfter(monthAgo)) {
-                monthGain += add;
+                monthValues.add(star);
             }
         }
+        double weekGain = strategy.aggregateValues(weekValues);
+        double monthGain = strategy.aggregateValues(monthValues);
 
-        Map<String, Integer> totalsMap = new LinkedHashMap<>();
+        Map<String, int[]> subjectAgg = new LinkedHashMap<>();
         for (HomeworkPortalSubmissionEntity h : graded) {
             String subj = normalizeSubjectKey(h.getSubjectTitle());
-            int add = h.getStars() != null ? h.getStars() : 0;
-            totalsMap.merge(subj, add, Integer::sum);
+            int[] pair = subjectAgg.computeIfAbsent(subj, k -> new int[2]);
+            pair[0] += h.getStars() != null ? h.getStars() : 0;
+            pair[1]++;
         }
-        List<SubjectStarTotalRow> subjectTotals = totalsMap.entrySet().stream()
-                .sorted((a, b) -> Integer.compare(b.getValue(), a.getValue()))
-                .map(e -> new SubjectStarTotalRow(e.getKey(), e.getValue()))
+        List<SubjectStarTotalRow> subjectTotals = subjectAgg.entrySet().stream()
+                .sorted((a, b) -> Double.compare(
+                        strategy.aggregateSumAndCount(b.getValue()[0], b.getValue()[1]),
+                        strategy.aggregateSumAndCount(a.getValue()[0], a.getValue()[1])))
+                .map(e -> new SubjectStarTotalRow(
+                        e.getKey(),
+                        strategy.aggregateSumAndCount(e.getValue()[0], e.getValue()[1])))
                 .toList();
 
         ZoneId zone = ZoneId.systemDefault();
@@ -291,7 +309,7 @@ public class StudentHomeworkPortalService {
                 .toList();
 
         List<String> chartLabels;
-        Map<String, List<Integer>> chartSeries;
+        Map<String, List<Double>> chartSeries;
         String chartGranularity;
         if (subjectKeys.isEmpty()) {
             chartGranularity = useDaily ? "DAY" : "MONTH";
@@ -318,23 +336,10 @@ public class StudentHomeworkPortalService {
                 days.add(d);
             }
             chartLabels = days.stream().map(StudentHomeworkPortalService::formatDayLabel).toList();
-            int[][] raw = new int[subjectKeys.size()][days.size()];
-            for (HomeworkPortalSubmissionEntity h : gradedInRange) {
-                String subj = normalizeSubjectKey(h.getSubjectTitle());
-                int si = subjectKeys.indexOf(subj);
-                if (si < 0) {
-                    continue;
-                }
-                Instant when = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
-                LocalDate d = when.atZone(zone).toLocalDate();
-                int di = days.indexOf(d);
-                if (di < 0) {
-                    continue;
-                }
-                int add = h.getStars() != null ? h.getStars() : 0;
-                raw[si][di] += add;
-            }
-            chartSeries = buildCumulativeSeries(subjectKeys, raw);
+            int[][] bucketSums = new int[subjectKeys.size()][days.size()];
+            int[][] bucketCounts = new int[subjectKeys.size()][days.size()];
+            fillChartBuckets(gradedInRange, subjectKeys, zone, days, null, bucketSums, bucketCounts);
+            chartSeries = strategy.buildChartSeries(subjectKeys, bucketSums, bucketCounts);
         } else {
             chartGranularity = "MONTH";
             List<YearMonth> months = new ArrayList<>();
@@ -344,23 +349,10 @@ public class StudentHomeworkPortalService {
                 months.add(ym);
             }
             chartLabels = months.stream().map(this::formatMonthLabel).toList();
-            int[][] raw = new int[subjectKeys.size()][months.size()];
-            for (HomeworkPortalSubmissionEntity h : gradedInRange) {
-                String subj = normalizeSubjectKey(h.getSubjectTitle());
-                int si = subjectKeys.indexOf(subj);
-                if (si < 0) {
-                    continue;
-                }
-                Instant when = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
-                YearMonth ym = YearMonth.from(when.atZone(zone));
-                int mi = months.indexOf(ym);
-                if (mi < 0) {
-                    continue;
-                }
-                int add = h.getStars() != null ? h.getStars() : 0;
-                raw[si][mi] += add;
-            }
-            chartSeries = buildCumulativeSeries(subjectKeys, raw);
+            int[][] bucketSums = new int[subjectKeys.size()][months.size()];
+            int[][] bucketCounts = new int[subjectKeys.size()][months.size()];
+            fillChartBuckets(gradedInRange, subjectKeys, zone, null, months, bucketSums, bucketCounts);
+            chartSeries = strategy.buildChartSeries(subjectKeys, bucketSums, bucketCounts);
         }
 
         List<StarRewardLogRow> rewardLog = graded.stream()
@@ -387,6 +379,7 @@ public class StudentHomeworkPortalService {
                 .toList();
 
         return new StudentMyStarsResponse(
+                gradingMethodWire,
                 totalStars,
                 weekGain,
                 monthGain,
@@ -399,19 +392,37 @@ public class StudentHomeworkPortalService {
         );
     }
 
-    private static Map<String, List<Integer>> buildCumulativeSeries(List<String> subjectKeys, int[][] raw) {
-        Map<String, List<Integer>> chartSeries = new LinkedHashMap<>();
-        int bucketCount = subjectKeys.isEmpty() || raw.length == 0 ? 0 : raw[0].length;
-        for (int si = 0; si < subjectKeys.size(); si++) {
-            List<Integer> cumulative = new ArrayList<>();
-            int run = 0;
-            for (int bi = 0; bi < bucketCount; bi++) {
-                run += raw[si][bi];
-                cumulative.add(run);
+    private static void fillChartBuckets(
+            List<HomeworkPortalSubmissionEntity> gradedInRange,
+            List<String> subjectKeys,
+            ZoneId zone,
+            List<LocalDate> days,
+            List<YearMonth> months,
+            int[][] bucketSums,
+            int[][] bucketCounts
+    ) {
+        for (HomeworkPortalSubmissionEntity h : gradedInRange) {
+            String subj = normalizeSubjectKey(h.getSubjectTitle());
+            int si = subjectKeys.indexOf(subj);
+            if (si < 0) {
+                continue;
             }
-            chartSeries.put(subjectKeys.get(si), cumulative);
+            Instant when = h.getGradedAt() != null ? h.getGradedAt() : h.getSubmittedAt();
+            int bi;
+            if (days != null) {
+                LocalDate d = when.atZone(zone).toLocalDate();
+                bi = days.indexOf(d);
+            } else {
+                YearMonth ym = YearMonth.from(when.atZone(zone));
+                bi = months.indexOf(ym);
+            }
+            if (bi < 0) {
+                continue;
+            }
+            int add = h.getStars() != null ? h.getStars() : 0;
+            bucketSums[si][bi] += add;
+            bucketCounts[si][bi]++;
         }
-        return chartSeries;
     }
 
     private static String normalizeSubjectKey(String subjectTitle) {

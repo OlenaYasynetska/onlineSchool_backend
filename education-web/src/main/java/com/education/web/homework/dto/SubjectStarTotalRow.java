@@ -1,5 +1,5 @@
 package com.education.web.homework.dto;
 
-/** Загальна кількість зірок за предметом (оцінені ДЗ учня). */
-public record SubjectStarTotalRow(String subject, int starsTotal) {
+/** Загальний показник за предметом (sum або average — залежить від {@code gradingMethod} школи). */
+public record SubjectStarTotalRow(String subject, double starsTotal) {
 }
