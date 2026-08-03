@@ -83,6 +83,7 @@ public class StudentRegistrationService {
         user.setLastName(names[1]);
         user.setRole(UserRole.STUDENT);
         user.setEnabled(true);
+        user.setEmailVerified(true);
         user = users.save(user);
 
         StudentView created;

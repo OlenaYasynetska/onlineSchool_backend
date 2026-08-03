@@ -109,6 +109,7 @@ public class SchoolAdminTeachersService {
         user.setLastName(last);
         user.setRole(UserRole.TEACHER);
         user.setEnabled(true);
+        user.setEmailVerified(true);
         String phoneRaw = req.phone();
         if (phoneRaw != null && !phoneRaw.isBlank()) {
             user.setPhone(phoneRaw.trim());

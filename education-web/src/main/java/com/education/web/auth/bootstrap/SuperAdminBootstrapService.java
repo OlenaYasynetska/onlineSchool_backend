@@ -66,6 +66,7 @@ public class SuperAdminBootstrapService {
             }
             user.setPasswordHash(passwordEncoder.encode(plain));
             user.setEnabled(true);
+            user.setEmailVerified(true);
             users.save(user);
             log.info("Super admin password synced from environment for {}", normalizedEmail);
             return;
@@ -78,6 +79,7 @@ public class SuperAdminBootstrapService {
         user.setLastName("Admin");
         user.setRole(UserRole.SUPER_ADMIN);
         user.setEnabled(true);
+        user.setEmailVerified(true);
         users.save(user);
         log.info("Super admin user created: {}", normalizedEmail);
     }

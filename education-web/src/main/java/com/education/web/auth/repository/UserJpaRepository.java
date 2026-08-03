@@ -13,5 +13,9 @@ public interface UserJpaRepository extends JpaRepository<UserEntity, String> {
     boolean existsByEmailIgnoreCase(String email);
 
     List<UserEntity> findAllByRoleOrderByCreatedAtDesc(UserRole role);
+
+    Optional<UserEntity> findByEmailVerificationToken(String token);
+
+    Optional<UserEntity> findByPasswordResetToken(String token);
 }
 
